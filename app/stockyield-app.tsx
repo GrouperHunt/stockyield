@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast, Toaster } from "sonner";
 import {
   CHAIN_ID, CHAIN_ID_HEX, EXPLORER, RPC_URL, STRATEGY_STALE_MS, TRANSACTIONS_ENABLED, USDG, USDG_DECIMALS, VAULT, ZERO_ADDRESS,
-  cash, chain, compact, describeTxError, erc20Abi, gateAbi, parseAmount, pct, sanitizeAmountInput, short, vaultAbi,
+  cash, chain, compact, describeTxError, erc20Abi, isReceiptTimeout, gateAbi, parseAmount, pct, sanitizeAmountInput, short, vaultAbi,
   type EIP6963ProviderDetail, type Position, type Strategy,
 } from "@/lib/vault";
 
@@ -44,7 +44,7 @@ export default function StockYieldApp() {
   const [busy, setBusy] = useState(false);
   const [details, setDetails] = useState(false);
   const [txOpen, setTxOpen] = useState(false);
-  const [step, setStep] = useState<"approval" | "deposit" | "withdraw" | "done">("approval");
+  const [step, setStep] = useState<"approval" | "deposit" | "withdraw" | "done" | "pending">("approval");
   const [hash, setHash] = useState<string | null>(null);
 
   const requestRef = useRef(0);
@@ -343,6 +343,10 @@ export default function StockYieldApp() {
       setAmount("");
       await loadPosition(address);
     } catch (e) {
+      if (isReceiptTimeout(e)) {
+        setStep("pending");
+        return;
+      }
       setTxOpen(false);
       toast.error("Transaction not completed", { description: describeTxError(e) });
     } finally {
@@ -533,14 +537,14 @@ export default function StockYieldApp() {
       <Dialog open={txOpen} onOpenChange={(o) => { if (!busy) setTxOpen(o); }}>
         <DialogContent className="rounded-[26px] bg-[#fcfdf9] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{step === "done" ? "Transaction confirmed" : "Confirm in your wallet"}</DialogTitle>
-            <DialogDescription>{step === "approval" ? "Allow the vault to use the selected USDG." : step === "deposit" ? "Deposit USDG directly into Morpho." : step === "withdraw" ? "Return USDG to your wallet." : "Your position has been updated."}</DialogDescription>
+            <DialogTitle>{step === "done" ? "Transaction confirmed" : step === "pending" ? "Still pending" : "Confirm in your wallet"}</DialogTitle>
+            <DialogDescription>{step === "approval" ? "Allow the vault to use the selected USDG." : step === "deposit" ? "Deposit USDG directly into Morpho." : step === "withdraw" ? "Return USDG to your wallet." : step === "pending" ? "Your transaction was sent but is not confirmed yet. It may still succeed. Check its status on the explorer before trying again — do not resend." : "Your position has been updated."}</DialogDescription>
           </DialogHeader>
           <div className="my-4 grid place-items-center">
-            <span className="grid h-20 w-20 place-items-center rounded-full bg-[#e6f4e9] text-[#21643f]">{step === "done" ? <Check size={36} /> : <LoaderCircle size={32} className="animate-spin" />}</span>
+            <span className="grid h-20 w-20 place-items-center rounded-full bg-[#e6f4e9] text-[#21643f]">{step === "done" ? <Check size={36} /> : step === "pending" ? <Clock3 size={32} /> : <LoaderCircle size={32} className="animate-spin" />}</span>
           </div>
           {hash && <a href={`${EXPLORER}/tx/${hash}`} target="_blank" className="flex justify-center gap-2 text-sm font-medium text-[#21643f]">View transaction <ExternalLink size={14} /></a>}
-          {step === "done" && <Button onClick={() => setTxOpen(false)} className="mt-3 w-full">Done</Button>}
+          {(step === "done" || step === "pending") && <Button onClick={() => { setTxOpen(false); if (address) void loadPosition(address); }} className="mt-3 w-full">{step === "done" ? "Done" : "Close and refresh position"}</Button>}
         </DialogContent>
       </Dialog>
     </main>

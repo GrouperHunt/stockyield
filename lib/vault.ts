@@ -176,6 +176,13 @@ export function parseAmount(amount: string): bigint {
 // its actual state) — an underflow panic on an over-withdraw, and the vault's
 // own TransferFromReverted custom error (selector 0xe65b7a77) on insufficient
 // allowance. See VALIDATION.md for the reproduction.
+// viem throws these when the receipt is not found within its wait window. The
+// transaction was already sent and may still confirm, so it is not a failure.
+export function isReceiptTimeout(e: unknown): boolean {
+  const name = (e as { name?: string } | undefined)?.name ?? "";
+  return name === "WaitForTransactionReceiptTimeoutError" || name === "TransactionReceiptNotFoundError";
+}
+
 export function describeTxError(e: unknown): string {
   const code = (e as { code?: number; cause?: { code?: number } } | undefined)?.code ?? (e as { cause?: { code?: number } } | undefined)?.cause?.code;
   if (code === 4001) return "You rejected the request in your wallet.";
