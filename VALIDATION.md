@@ -110,6 +110,25 @@ Tutte le prove sotto sono su una build locale di produzione, con wallet e RPC **
 
 **Note sui dati mostrati (fonte: descrizioni ufficiali dello schema GraphQL di Morpho, lette via introspezione il 24/09/2026)**: `netApy` = "Current net APY of the vault (after fees, including rewards)"; `avgNetApy` = media realizzata dopo commissioni e reward su un periodo di lookback (default 6 ore); `liquidity` = liquidità dell'adapter di liquidità + asset idle; `totalAssetsUsd` = asset totali nel vault (mostrato come "Vault TVL").
 
+## Revisione indipendente prima del lancio (24/09/2026)
+Un revisore indipendente (un secondo agente, sola lettura, senza il contesto di questa sessione) ha letto il codice cercando bug sui soldi, race, feature flag, dati mostrati, errori, accessibilità e deploy. `tsc` ed `eslint` puliti. Esito, verificato voce per voce da me prima di correggere:
+
+| # | Segnalazione | Esito |
+|---|---|---|
+| 1 | La liquidità riportata dall'API poteva bloccare un prelievo consentito dalla chain | Confermata, corretta: ora limita solo il MAX; decide la simulazione. Conversione protetta contro valori non finiti |
+| 2 | Cambiando account durante l'approve, il deposito partiva comunque | **Confermata e riprodotta** (mutation test: 2 invii invece di 1). Corretta: `execute` si ferma se l'operazione è invalidata |
+| 3 | Errore RPC nel polling della receipt dopo l'invio mostrato come "Failed" | Confermata, corretta: diventa "Still pending" + avviso di non reinviare |
+| 4 | Finestra non chiudibile mentre attende il wallet | Confermata, corretta |
+| 5 | Controlli non disponibili contavano come "Ready to sign" | Confermata, corretta: ora "Checks incomplete" |
+| 6 | Deposito attivo dopo un errore di refresh dei dati | Confermata, corretta |
+| 7 | Testo "verified configuration" | Corretto |
+| 8 | Puntini SMIL non nascosti con reduced-motion | **Falso positivo**: il gruppo ha la classe `dot` e il test verifica `display: none` |
+| 9 | Riconnessione silenziosa può usare un wallet diverso con più wallet installati | Confermata, corretta: niente riconnessione automatica se ci sono più wallet |
+| — | Retry della simulazione dopo l'approve con nodo in ritardo | Aggiunto (3 tentativi). **Non ha un test automatico**: il comportamento con un nodo davvero in ritardo non è provato |
+| — | Timeout sul corpo di `/api/strategy` | Corretto |
+
+Dopo le correzioni: 32 controlli con wallet finto e 14 di movimento superati; nessun overflow a 320 px sulle 4 pagine; Lighthouse accessibilità 100 su Earn e Position (rieseguito). Il test manuale con wallet reale del proprietario sulla preview (ciclo completo, importo minimo) è andato a buon fine **prima** di queste correzioni: le correzioni cambiano il codice del percorso transazioni, quindi vanno riprovate con un ciclo completo sulla preview aggiornata.
+
 ## Riepilogo modifiche di questa sessione
 1. Rimosso l'uso di `maxDeposit`/`maxWithdraw` come blocco/limite (bug che avrebbe reso impossibile ogni deposito e mostrato sempre "0" disponibile per il prelievo) — sostituito con lettura diretta dei quattro gate (`gateAbi` in [lib/vault.ts](lib/vault.ts)) e con il saldo posizione reale (`convertToAssets`) come base per il prelievo.
 2. Aggiunta la verifica periodica (ogni 5 minuti) dello stato dei gate, con blocco esplicito e messaggio chiaro se un gate viene attivato in futuro.
