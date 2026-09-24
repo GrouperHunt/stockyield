@@ -290,7 +290,7 @@ export default function StockYieldApp() {
       await connect();
       return;
     }
-    if (!strategy || !enough) return;
+    if (!enough || (mode === "deposit" && !strategy)) return;
     if (depositBlockedByStaleData) {
       toast.error("Vault data is stale", { description: "Refresh before depositing so you're not acting on outdated numbers." });
       return;
@@ -437,9 +437,9 @@ export default function StockYieldApp() {
                 <Row l="Destination" v="Steakhouse · Morpho" />
                 <Row l="Network fee" v="Paid in ETH, shown in your wallet before you sign" />
               </div>
-              <YieldCheck connected={!!address} data={!!strategy && !dataError && (!dataStale || mode === "withdraw")} gas={hasGas} amount={!amount || enough} gatesOpen={gatesOpen} network={!wrongNetwork} />
+              <YieldCheck connected={!!address} data={mode === "withdraw" || (!!strategy && !dataError && !dataStale)} gas={hasGas} amount={!amount || enough} gatesOpen={gatesOpen} network={!wrongNetwork} />
               <Button
-                disabled={switchable ? busy : !TRANSACTIONS_ENABLED || busy || gatesOpen === false || !strategy || (!!address && (!enough || !hasGas || depositBlockedByStaleData))}
+                disabled={switchable ? busy : !TRANSACTIONS_ENABLED || busy || gatesOpen === false || (mode === "deposit" && !strategy) || (!!address && (!enough || !hasGas || depositBlockedByStaleData))}
                 onClick={switchable ? switchNetwork : transact}
                 className="mt-5 h-14 w-full rounded-[18px] bg-[#b7f24a] text-base font-semibold text-[#173f2c] hover:bg-[#c4fa5d] disabled:bg-white/20 disabled:text-white/45"
               >
