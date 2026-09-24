@@ -7,3 +7,4 @@ out/
 *.tsbuildinfo
 .vercel
 stockyield-brand/source/
+.DS_Store
