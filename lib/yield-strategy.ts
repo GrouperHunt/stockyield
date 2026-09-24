@@ -4,7 +4,15 @@ import type { Address, WalletClient } from "viem";
 // adapter only exposes what it really implements, and is not assumed to behave
 // like a generic ERC-4626 vault.
 export type TxAction = "deposit" | "withdraw";
-export type TxStep = "approval" | "deposit" | "withdraw" | "done" | "pending";
+export type TxStep = "approval" | "deposit" | "withdraw" | "done" | "pending" | "failed" | "rejected";
+
+// Result of a pre-signature simulation. "failed" = the contract would revert;
+// "unavailable" = we could not run the check (RPC/network), which is not a pass.
+export type SimResult =
+  | { status: "passed"; step: "approval" | "deposit" | "withdraw"; feeWei: bigint | null }
+  | { status: "failed"; reason: string }
+  | { status: "unavailable"; reason: string };
+export type SimState = { status: "idle" | "checking" } | SimResult;
 
 export type StrategyMetrics = {
   address: Address;
@@ -38,6 +46,8 @@ export type StrategyInfo = {
   vault: Address;
   explorer: string;
   strategyUrl: string;
+  docsUrl: string;
+  vaultDocsNote: string;
 };
 
 export type ExecuteParams = {
@@ -47,6 +57,7 @@ export type ExecuteParams = {
   hasShares: boolean;
   onStep: (step: TxStep) => void;
   onHash: (hash: string | null) => void;
+  onSim?: (sim: SimState) => void;
 };
 
 export interface YieldStrategy {
@@ -57,6 +68,9 @@ export interface YieldStrategy {
   readPosition(owner: Address): Promise<Position>;
   // true = open to any wallet, false = a gate is active. Only when capabilities.accessGates.
   readAccessOpen?(): Promise<boolean>;
+  // true = on-chain asset/decimals match this adapter's configuration.
+  readConfigValid?(): Promise<boolean>;
+  simulate(action: TxAction, params: { owner: Address; amount: bigint }): Promise<SimResult>;
   execute(action: TxAction, params: ExecuteParams): Promise<void>;
 }
 

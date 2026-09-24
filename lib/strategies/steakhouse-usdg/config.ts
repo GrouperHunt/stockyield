@@ -44,6 +44,7 @@ export const chain = defineChain({
 export const erc20Abi = [
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ type: "uint256" }] },
   { type: "function", name: "allowance", stateMutability: "view", inputs: [{ name: "owner", type: "address" }, { name: "spender", type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "decimals", stateMutability: "view", inputs: [], outputs: [{ type: "uint8" }] },
   { type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }], outputs: [{ type: "bool" }] },
 ] as const;
 
@@ -61,6 +62,10 @@ export const vaultAbi = [
 // disabled (0x0) before showing the deposit/withdraw UI as available. This is
 // a live safety check, not a cap — if Steakhouse ever turns a gate on, this
 // catches it and the app should stop claiming permissionless access.
+export const assetAbi = [
+  { type: "function", name: "asset", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+] as const;
+
 export const gateAbi = [
   { type: "function", name: "receiveSharesGate", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "sendSharesGate", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },

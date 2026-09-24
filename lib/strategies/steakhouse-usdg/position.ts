@@ -1,6 +1,6 @@
 import type { Address } from "viem";
 import type { Position } from "@/lib/yield-strategy";
-import { erc20Abi, gateAbi, publicClient as client, USDG, VAULT, vaultAbi, ZERO_ADDRESS } from "./config";
+import { assetAbi, erc20Abi, gateAbi, publicClient as client, USDG, USDG_DECIMALS, VAULT, vaultAbi, ZERO_ADDRESS } from "./config";
 
 export async function readPosition(owner: Address): Promise<Position> {
   const [walletBalance, shares, ethBalance] = await Promise.all([
@@ -25,4 +25,14 @@ export async function readAccessOpen(): Promise<boolean> {
   ]);
   const isZero = (a: Address) => a.toLowerCase() === ZERO_ADDRESS;
   return isZero(receiveShares) && isZero(sendShares) && isZero(receiveAssets) && isZero(sendAssets);
+}
+
+// Confirms on-chain that the configured asset and decimals are still the ones the
+// UI assumes (vault.asset() === USDG, USDG.decimals() === 6) before any amount is trusted.
+export async function readConfigValid(): Promise<boolean> {
+  const [asset, decimals] = await Promise.all([
+    client.readContract({ address: VAULT, abi: assetAbi, functionName: "asset" }),
+    client.readContract({ address: USDG, abi: erc20Abi, functionName: "decimals" }),
+  ]);
+  return asset.toLowerCase() === USDG.toLowerCase() && decimals === USDG_DECIMALS;
 }

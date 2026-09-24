@@ -3,8 +3,8 @@ import { useRef, useState } from "react";
 import { createWalletClient, custom, type Address, type EIP1193Provider } from "viem";
 import { toast } from "sonner";
 import { chain } from "@/lib/strategies/steakhouse-usdg/config";
-import { describeTxError, isReceiptTimeout } from "@/lib/tx-errors";
-import type { TxAction, TxStep, YieldStrategy } from "@/lib/yield-strategy";
+import { describeTxError, isReceiptTimeout, isUserRejection } from "@/lib/tx-errors";
+import type { SimState, TxAction, TxStep, YieldStrategy } from "@/lib/yield-strategy";
 
 type Ctx = {
   provider: EIP1193Provider | null;
@@ -17,7 +17,17 @@ export function useTransaction(strategy: YieldStrategy, { provider, address, ens
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<TxStep>("approval");
   const [hash, setHash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [sim, setSim] = useState<SimState>({ status: "idle" });
+  const [action, setAction] = useState<TxAction>("deposit");
+  const [approvalNeeded, setApprovalNeeded] = useState(false);
+  const [failedAt, setFailedAt] = useState<TxStep | null>(null);
   const runRef = useRef(0);
+  const stepRef = useRef<TxStep>("approval");
+  const put = (s: TxStep) => {
+    stepRef.current = s;
+    setStep(s);
+  };
 
   // Called when the account/network changes: the previous operation must not
   // touch the UI or refresh anything for the old account when it settles.
@@ -27,14 +37,19 @@ export function useTransaction(strategy: YieldStrategy, { provider, address, ens
     setBusy(false);
   };
 
-  const run = async (action: TxAction, amount: bigint, hasShares: boolean, onDone: () => Promise<void> | void) => {
+  const run = async (act: TxAction, amount: bigint, hasShares: boolean, onDone: () => Promise<void> | void) => {
     if (!provider || !address) return;
     const id = ++runRef.current;
     const live = () => runRef.current === id;
     setBusy(true);
     setOpen(true);
     setHash(null);
-    setStep(action === "deposit" ? "approval" : "withdraw");
+    setError(null);
+    setSim({ status: "idle" });
+    setAction(act);
+    setApprovalNeeded(false);
+    setFailedAt(null);
+    put(act === "deposit" ? "approval" : "withdraw");
     try {
       // Re-read the live account/chain right before signing: UI state may be stale.
       const liveAccounts = (await provider.request({ method: "eth_accounts" })) as string[];
@@ -43,22 +58,40 @@ export function useTransaction(strategy: YieldStrategy, { provider, address, ens
       }
       await ensureChain(provider);
       const wallet = createWalletClient({ account: address, chain, transport: custom(provider) });
-      await strategy.execute(action, { owner: address, amount, wallet, hasShares, onStep: (s) => live() && setStep(s), onHash: (h) => live() && setHash(h) });
+      await strategy.execute(act, {
+        owner: address,
+        amount,
+        wallet,
+        hasShares,
+        onStep: (s) => {
+          if (!live()) return;
+          if (s === "approval") setApprovalNeeded(true);
+          put(s);
+        },
+        onHash: (h) => live() && setHash(h),
+        onSim: (s) => live() && setSim(s),
+      });
       if (!live()) return;
-      setStep("done");
+      put("done");
       await onDone();
     } catch (e) {
       if (!live()) return;
+      setFailedAt(stepRef.current);
       if (isReceiptTimeout(e)) {
-        setStep("pending");
+        put("pending");
         return;
       }
-      setOpen(false);
-      toast.error("Transaction not completed", { description: describeTxError(e) });
+      setError(describeTxError(e));
+      if (isUserRejection(e)) {
+        put("rejected");
+      } else {
+        put("failed");
+        toast.error("Transaction not completed", { description: describeTxError(e) });
+      }
     } finally {
       if (live()) setBusy(false);
     }
   };
 
-  return { open, setOpen, busy, step, hash, run, invalidate };
+  return { open, setOpen, busy, step, hash, error, sim, action, approvalNeeded, failedAt, run, invalidate };
 }

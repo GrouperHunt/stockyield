@@ -1,8 +1,8 @@
 import type { YieldStrategy } from "@/lib/yield-strategy";
 import { CHAIN_ID, EXPLORER, SHARE_DECIMALS, USDG, USDG_DECIMALS, VAULT } from "./config";
 import { readMetrics } from "./metrics";
-import { readAccessOpen, readPosition } from "./position";
-import { execute } from "./transactions";
+import { readAccessOpen, readConfigValid, readPosition } from "./position";
+import { execute, simulate } from "./transactions";
 
 export const steakhouseUsdg: YieldStrategy = {
   id: "steakhouse-usdg",
@@ -16,11 +16,15 @@ export const steakhouseUsdg: YieldStrategy = {
     shareDecimals: SHARE_DECIMALS,
     vault: VAULT,
     explorer: EXPLORER,
+    docsUrl: "https://docs.morpho.org/",
+    vaultDocsNote: "Morpho documentation for Vault V2",
     strategyUrl: "https://app.morpho.org/robinhood-chain/vault/0xBeEff033F34C046626B8D0A041844C5d1A5409dd/steakhouse-usdg",
   },
   capabilities: { deposit: true, withdraw: true, accessGates: true },
   readMetrics,
   readPosition,
   readAccessOpen,
+  readConfigValid,
+  simulate,
   execute,
 };

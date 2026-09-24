@@ -5,6 +5,12 @@ export function isReceiptTimeout(e: unknown): boolean {
   return name === "WaitForTransactionReceiptTimeoutError" || name === "TransactionReceiptNotFoundError";
 }
 
+export function isUserRejection(e: unknown): boolean {
+  const code = (e as { code?: number; cause?: { code?: number } } | undefined)?.code ?? (e as { cause?: { code?: number } } | undefined)?.cause?.code;
+  const message = e instanceof Error ? e.message : "";
+  return code === 4001 || /User rejected|denied transaction/i.test(message);
+}
+
 // Patterns below are not guesses: they were produced by simulating real
 // reverts from the deployed vault (via simulateContract on a forked copy of
 // its actual state) — an underflow panic on an over-withdraw, and the vault's

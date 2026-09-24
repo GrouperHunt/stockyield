@@ -9,6 +9,7 @@ export function useMetrics(strategy: YieldStrategy) {
   const [error, setError] = useState(false);
   const [stale, setStale] = useState(false);
   const [gatesOpen, setGatesOpen] = useState<boolean | null>(null);
+  const [configOk, setConfigOk] = useState<boolean | null>(null);
 
   const refresh = useCallback(async () => {
     setError(false);
@@ -22,11 +23,15 @@ export function useMetrics(strategy: YieldStrategy) {
   }, [strategy]);
 
   const loadGates = useCallback(async () => {
-    if (!strategy.readAccessOpen) return;
     try {
-      setGatesOpen(await strategy.readAccessOpen());
+      if (strategy.readAccessOpen) setGatesOpen(await strategy.readAccessOpen());
     } catch {
       setGatesOpen(null);
+    }
+    try {
+      if (strategy.readConfigValid) setConfigOk(await strategy.readConfigValid());
+    } catch {
+      setConfigOk(null);
     }
   }, [strategy]);
 
@@ -52,5 +57,5 @@ export function useMetrics(strategy: YieldStrategy) {
     return () => clearInterval(i);
   }, [loadGates]);
 
-  return { metrics, fetchedAt, error, stale, gatesOpen, refresh };
+  return { metrics, fetchedAt, error, stale, gatesOpen, configOk, refresh };
 }

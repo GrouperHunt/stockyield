@@ -6,6 +6,7 @@ import type { Position, YieldStrategy } from "@/lib/yield-strategy";
 export function usePosition(strategy: YieldStrategy) {
   const [position, setPosition] = useState<Position | null>(null);
   const [error, setError] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const requestRef = useRef(0);
 
   const load = useCallback(
@@ -16,6 +17,7 @@ export function usePosition(strategy: YieldStrategy) {
         if (requestId !== requestRef.current) return; // a newer account/chain change superseded this read
         setPosition(p);
         setError(false);
+        setUpdatedAt(new Date().toISOString());
       } catch {
         if (requestId !== requestRef.current) return;
         setError(true);
@@ -30,7 +32,8 @@ export function usePosition(strategy: YieldStrategy) {
     requestRef.current++;
     setPosition(null);
     setError(false);
+    setUpdatedAt(null);
   }, []);
 
-  return { position, error, load, reset };
+  return { position, error, updatedAt, load, reset };
 }
