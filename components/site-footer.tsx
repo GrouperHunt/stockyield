@@ -41,7 +41,7 @@ export function SiteFooter() {
               <p className="mt-1 break-all font-mono text-xs">{TOKEN.address}</p>
               <div className="mt-1 flex gap-4">
                 <button type="button" onClick={() => navigator.clipboard?.writeText(TOKEN.address!)} className="underline-offset-4 hover:underline">Copy address</button>
-                <a className="underline-offset-4 hover:underline" href={`${info.explorer}/token/${TOKEN.address}`} target="_blank" rel="noreferrer">Explorer ↗</a>
+                <a className="underline-offset-4 hover:underline" href={`${info.explorer}/address/${TOKEN.address}`} target="_blank" rel="noreferrer">Explorer ↗</a>
               </div>
             </div>
           )}
