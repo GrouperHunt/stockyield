@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { TRANSACTIONS_ENABLED } from "@/lib/flags";
 import { cash, pct, sanitizeAmountInput, short } from "@/lib/format";
+import { Sk } from "./sk";
 import { useStockYield } from "./provider";
 import { YieldCheck } from "./yield-check";
 
@@ -102,7 +103,7 @@ export function EarnModule() {
             <label htmlFor="amount" className="eyebrow">{mode === "deposit" ? "Amount to deposit" : "Amount to withdraw"}</label>
             <span className="num text-ink-2">
               {mode === "deposit" ? "Balance " : "Position value "}
-              {position ? <>{fmt(balance, decimals)} USDG</> : pos.error ? "Unavailable" : address ? <span className="skeleton">0.00 USDG</span> : "—"}
+              {position ? <>{fmt(balance, decimals)} USDG</> : pos.error ? "Unavailable" : address ? <Sk className="w-20" /> : "—"}
             </span>
           </div>
           <div className={`mt-2 flex items-center gap-3 border bg-surface px-4 py-3 transition-colors focus-within:border-ink ${overBalance ? "border-danger" : ""}`}>
@@ -122,7 +123,7 @@ export function EarnModule() {
             <button type="button" disabled={!position} onClick={() => s.setAmount(formatUnits(maxAmount, decimals))} className="border px-2 py-1 font-mono text-xs uppercase transition-colors hover:bg-surface-2 active:translate-y-px disabled:opacity-40">Max</button>
           </div>
           <div className="mt-2 flex justify-between text-xs text-ink-2">
-            <span className="num">{price !== null ? <>≈ {cash(Number(amount || 0) * price)}</> : "USD value unavailable"}</span>
+            <span className="num">{parsed === 0n ? "" : price !== null ? <>≈ {cash(Number(amount) * price)}</> : "USD value unavailable"}</span>
             {mode === "withdraw" && limitedByLiquidity && <span>MAX is limited to the last reported liquidity</span>}
           </div>
           {aboveReportedLiquidity && !overBalance && (
@@ -137,7 +138,7 @@ export function EarnModule() {
 
         <Dl
           rows={[
-            ["Current net APY (variable)", <span key="a" className="num">{m.error && !metrics ? "Unavailable" : metrics ? pct(metrics.netApy) : <span className="skeleton">0.00%</span>}</span>],
+            ["Current net APY (variable)", <span key="a" className="num">{m.error && !metrics ? "Unavailable" : metrics ? pct(metrics.netApy) : <Sk className="w-14" />}</span>],
             mode === "deposit"
               ? ["Estimated annual yield", <span key="y"><span className="num">{!metrics ? "Unavailable" : parsed > 0n ? cash(Number(amount) * metrics.netApy) : "—"}</span><span className="mt-1 block text-xs font-normal text-ink-2">Estimate at current variable APY. Not guaranteed.</span></span>]
               : ["You receive (estimate)", <span key="r" className="num">{parsed > 0n ? `≈ ${fmt(parsed, decimals)} USDG` : "—"}</span>],

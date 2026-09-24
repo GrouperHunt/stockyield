@@ -1,7 +1,7 @@
 "use client";
 import { ExternalLink } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { cash, pct, short } from "@/lib/format";
+import { feePct, pct, short, usdg } from "@/lib/format";
 import { useStockYield } from "./provider";
 
 function Row({ k, children }: { k: string; children: React.ReactNode }) {
@@ -46,9 +46,9 @@ export function StrategyDetailsContent() {
         <dl className="border-y">
           <Row k="Net APY (variable)"><span className="num">{x ? pct(x.netApy) : Unavailable}</span><span className="block text-xs text-ink-2">Current rate after vault fees, including rewards (Morpho API definition).</span></Row>
           <Row k="Average net APY"><span className="num">{x ? pct(x.avgNetApy) : Unavailable}</span><span className="block text-xs text-ink-2">Realized average after fees, including rewards, over Morpho&apos;s default lookback (6 hours, per its API documentation).</span></Row>
-          <Row k="Vault TVL"><span className="num">{x ? cash(x.totalAssetsUsd, 0) : Unavailable}</span><span className="block text-xs text-ink-2">Total assets in this vault. Not the amount deposited through StockYield.</span></Row>
-          <Row k="Liquidity reported by API"><span className="num">{x ? cash(x.liquidityUsd, 0) : Unavailable}</span><span className="block text-xs text-ink-2">Idle assets plus liquidity in the vault&apos;s liquidity adapter, as reported by Morpho. It is not a promise of what you can withdraw: that is checked by simulation.</span></Row>
-          <Row k="Vault fees"><span className="num">{x ? `management ${(x.managementFee * 100).toFixed(2)}% · performance ${(x.performanceFee * 100).toFixed(2)}%` : Unavailable}</span></Row>
+          <Row k="Vault TVL"><span className="num">{x ? usdg(x.totalAssets) : Unavailable}</span><span className="block text-xs text-ink-2">Total assets in this vault. Not the amount deposited through StockYield.</span></Row>
+          <Row k="Liquidity reported by API"><span className="num">{x ? usdg(x.liquidity) : Unavailable}</span><span className="block text-xs text-ink-2">Idle assets plus liquidity in the vault&apos;s liquidity adapter, as reported by Morpho. It is not a promise of what you can withdraw: that is checked by simulation.</span></Row>
+          <Row k="Vault fees"><span className="num">{x ? `management ${feePct(x.managementFee)} · performance ${feePct(x.performanceFee)}` : Unavailable}</span></Row>
           <Row k="StockYield fee">0% — StockYield does not charge a fee.</Row>
           <Row k="Network fee">Paid by you in ETH; estimated in Yield Check, final amount shown by your wallet.</Row>
         </dl>

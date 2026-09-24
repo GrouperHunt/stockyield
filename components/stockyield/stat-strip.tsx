@@ -1,7 +1,8 @@
 "use client";
 import { RefreshCw } from "lucide-react";
-import { compact, pct } from "@/lib/format";
+import { feePct, pct, usdg } from "@/lib/format";
 import { useStockYield } from "./provider";
+import { Sk } from "./sk";
 
 function Cell({ i, label, note, children }: { i: string; label: string; note?: string; children: React.ReactNode }) {
   return (
@@ -17,15 +18,15 @@ export function StatStrip() {
   const { m } = useStockYield();
   const x = m.metrics;
   const loading = !x && !m.error;
-  const V = (v: string) => (loading ? <span className="skeleton">00.00%</span> : x ? v : <span className="text-ink-2">Unavailable</span>);
+  const V = (v: string) => (loading ? <Sk className="w-28" /> : x ? v : <span className="text-ink-2">Unavailable</span>);
   return (
     <section aria-label="Vault metrics" className="border-y bg-surface">
       <div className="mx-auto max-w-[1200px] md:px-8">
         <div className="grid grid-cols-2 divide-x divide-y md:grid-cols-4 md:divide-y-0 md:border-x">
           <Cell i="01" label="Net APY" note="Variable · after vault fees">{V(x ? pct(x.netApy) : "")}</Cell>
-          <Cell i="02" label="Vault TVL" note="All deposits in this vault">{V(x ? `$${compact(x.totalAssetsUsd)}` : "")}</Cell>
-          <Cell i="03" label="Liquidity" note="Reported by API">{V(x ? `$${compact(x.liquidityUsd)}` : "")}</Cell>
-          <Cell i="04" label="Vault fees" note="Management · performance">{V(x ? `${(x.managementFee * 100).toFixed(2)}% · ${(x.performanceFee * 100).toFixed(2)}%` : "")}</Cell>
+          <Cell i="02" label="Vault TVL" note="Total assets in this vault, in USDG">{V(x ? usdg(x.totalAssets) : "")}</Cell>
+          <Cell i="03" label="Liquidity" note="Reported by API, in USDG">{V(x ? usdg(x.liquidity) : "")}</Cell>
+          <Cell i="04" label="Vault fees" note="Management · performance">{V(x ? `${feePct(x.managementFee)} · ${feePct(x.performanceFee)}` : "")}</Cell>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5 text-xs text-ink-2 md:border-x md:px-6">
           <span>

@@ -128,7 +128,7 @@
 .js[data-intro="play"] .intro-fade { animation: fade 0.5s var(--ease) both; }
 
 .sweep { animation: sweep 0.5s var(--ease); }
-.skeleton { display: inline-block; min-width: 3ch; border-radius: 2px; color: transparent !important; background: linear-gradient(90deg, var(--surface-2) 25%, #e6e2d6 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
+.skeleton { display: inline-block; min-width: 2ch; border-radius: 2px; color: transparent !important; background: linear-gradient(90deg, var(--surface-2) 25%, #e6e2d6 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
 .pulse-ring { animation: ring 1.6s ease-in-out infinite; }
 .indeterminate { position: relative; overflow: hidden; }
 .indeterminate::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 33%; background: var(--signal); animation: bar 1.4s var(--ease) infinite; }

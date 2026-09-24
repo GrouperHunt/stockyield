@@ -5,7 +5,7 @@ import { parseMetrics } from "@/lib/strategies/steakhouse-usdg/metrics";
 // edge-specific requirement, so it runs on the standard nodejs runtime.
 export const runtime = "nodejs";
 
-const QUERY = `query($address:String!,$chainId:Int!){ vaultV2ByAddress(address:$address,chainId:$chainId){ address name totalAssetsUsd liquidityUsd sharePrice netApy avgNetApy performanceFee managementFee listed asset{ address symbol decimals price{ usd } } } }`;
+const QUERY = `query($address:String!,$chainId:Int!){ vaultV2ByAddress(address:$address,chainId:$chainId){ address name totalAssets liquidity totalAssetsUsd liquidityUsd sharePrice netApy avgNetApy performanceFee managementFee listed asset{ address symbol decimals price{ usd } } } }`;
 
 export async function GET() {
   try {

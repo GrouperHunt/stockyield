@@ -1,6 +1,6 @@
 "use client";
 import { formatEther } from "viem";
-import { cash } from "@/lib/format";
+import { feePct, usdg } from "@/lib/format";
 import { useStockYield } from "./provider";
 import { StateMark, type CheckState } from "./state-mark";
 
@@ -31,6 +31,16 @@ export function YieldCheck() {
   const { info, m, wallet, sim, mode, hasGas, pos } = useStockYield();
   const { address, wrongNetwork } = wallet;
   const metrics = m.metrics;
+
+  // Without a wallet there is nothing to check yet: one line, the full list appears after connecting.
+  if (!address) {
+    return (
+      <section aria-labelledby="yc-title" className="border bg-surface">
+        <div className="border-b bg-mint-soft px-4 py-3"><h3 id="yc-title" className="text-sm font-semibold">Yield Check</h3></div>
+        <p className="px-4 py-4 text-sm text-ink-2">Connect your wallet to run the checks.</p>
+      </section>
+    );
+  }
 
   const network: CheckState = !address ? "unavailable" : wrongNetwork ? "failed" : "passed";
   const gas: CheckState = !address || !pos.position ? "unavailable" : hasGas ? "passed" : "failed";
@@ -66,12 +76,12 @@ export function YieldCheck() {
           <Item label="Network fee (estimate)" state={fee} note={feeNote} />
           <Item label="ETH for gas in your wallet" state={gas} />
           <p className="text-sm text-ink-2">
-            Vault fees: {metrics ? <span className="num">management {(metrics.managementFee * 100).toFixed(2)}% · performance {(metrics.performanceFee * 100).toFixed(2)}%</span> : "Unavailable"} · StockYield fee: 0%
+            Vault fees: {metrics ? <span className="num">management {feePct(metrics.managementFee)} · performance {feePct(metrics.performanceFee)}</span> : "Unavailable"} · StockYield fee: 0%
           </p>
         </Q>
         <Q q="What can limit withdrawal?">
           <p className="text-sm text-ink-2">
-            Withdrawals draw on idle assets and lending-market liquidity. Reported liquidity (Morpho API): <span className="num">{metrics ? cash(metrics.liquidityUsd, 0) : "Unavailable"}</span>. What can actually be withdrawn is checked by the simulation.
+            Withdrawals draw on idle assets and lending-market liquidity. Reported liquidity (Morpho API): <span className="num">{metrics ? usdg(metrics.liquidity) : "Unavailable"}</span>. What can actually be withdrawn is checked by the simulation.
           </p>
           <Item label="No allowlist gate on the vault" state={gates} />
         </Q>

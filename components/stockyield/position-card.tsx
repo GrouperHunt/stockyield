@@ -2,6 +2,7 @@
 import { formatUnits } from "viem";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { cash, pct, short } from "@/lib/format";
+import { Sk } from "./sk";
 import { useStockYield } from "./provider";
 
 function Field({ k, children }: { k: string; children: React.ReactNode }) {
@@ -75,7 +76,7 @@ export function PositionCard() {
         <Field k="Wallet"><a className="num inline-flex items-center gap-1 font-medium hover:underline" href={`${info.explorer}/address/${address}`} target="_blank" rel="noreferrer">{short(address)}<ExternalLink size={12} /></a></Field>
         <Field k="Vault"><a className="inline-flex items-center gap-1 font-medium hover:underline" href={`${info.explorer}/address/${info.vault}`} target="_blank" rel="noreferrer">{info.name} <span className="num text-ink-2">{short(info.vault)}</span><ExternalLink size={12} /></a></Field>
         <Field k="Vault shares"><span className="num">{Number(formatUnits(p.shares, info.shareDecimals)).toLocaleString(undefined, { maximumFractionDigits: 4 })}</span></Field>
-        <Field k="Current net APY (variable)"><span className="num">{m.metrics ? pct(m.metrics.netApy) : m.error ? "Unavailable" : <span className="skeleton">0.00%</span>}</span></Field>
+        <Field k="Current net APY (variable)"><span className="num">{m.metrics ? pct(m.metrics.netApy) : m.error ? "Unavailable" : <Sk className="w-14" />}</span></Field>
         <Field k="Last read"><span className="num">{pos.updatedAt ? new Date(pos.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—"}</span></Field>
       </dl>
 

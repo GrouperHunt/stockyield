@@ -6,6 +6,7 @@ import { Menu } from "lucide-react";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { short } from "@/lib/format";
 import { BrandMark } from "./brand-mark";
+import { XLink } from "./x-link";
 import { useStockYield } from "./stockyield/provider";
 
 const NAV = [
@@ -60,6 +61,7 @@ export function SiteHeader() {
             ))}
           </nav>
           <div className="flex items-center gap-2">
+            <XLink className="hidden md:grid" />
             <NetworkChip className="hidden md:inline-flex" />
             <button
               onClick={wallet.connect}
@@ -80,6 +82,7 @@ export function SiteHeader() {
                     </SheetClose>
                   ))}
                 </nav>
+                <div className="px-6 pt-6"><XLink /></div>
               </SheetContent>
             </Sheet>
           </div>

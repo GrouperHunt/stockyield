@@ -19,6 +19,9 @@ export type StrategyMetrics = {
   name: string;
   totalAssetsUsd: number;
   liquidityUsd: number;
+  // In USDG (asset units already divided by the asset's decimals).
+  totalAssets: number;
+  liquidity: number;
   sharePrice: number;
   netApy: number;
   avgNetApy: number;

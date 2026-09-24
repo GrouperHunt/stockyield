@@ -19,6 +19,8 @@ export function parseMetrics(raw: unknown): StrategyMetrics | null {
     typeof asset.address !== "string" ||
     asset.address.toLowerCase() !== USDG.toLowerCase() ||
     asset.decimals !== USDG_DECIMALS ||
+    !isFiniteNumber(v.totalAssets) ||
+    !isFiniteNumber(v.liquidity) ||
     !isFiniteNumber(v.totalAssetsUsd) ||
     !isFiniteNumber(v.liquidityUsd) ||
     !isFiniteNumber(v.sharePrice) ||
@@ -32,6 +34,8 @@ export function parseMetrics(raw: unknown): StrategyMetrics | null {
   return {
     address: v.address as Address,
     name: typeof v.name === "string" ? v.name : "Steakhouse USDG",
+    totalAssets: v.totalAssets / 10 ** USDG_DECIMALS,
+    liquidity: v.liquidity / 10 ** USDG_DECIMALS,
     totalAssetsUsd: v.totalAssetsUsd,
     liquidityUsd: v.liquidityUsd,
     sharePrice: v.sharePrice,

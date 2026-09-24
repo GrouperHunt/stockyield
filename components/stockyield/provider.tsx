@@ -48,8 +48,7 @@ function useStockYieldState() {
   // so a lagging third-party number can't stop a withdrawal the chain would allow.
   // maxWithdraw is not used: it is a hardcoded 0 in this Vault V2 (see config.ts).
   const positionValue = position?.assets ?? 0n;
-  const price = m.metrics?.assetPriceUsd ?? null;
-  const liquidityUnits = m.metrics && price !== null && price > 0 ? (m.metrics.liquidityUsd / price) * 10 ** decimals : null;
+  const liquidityUnits = m.metrics ? m.metrics.liquidity * 10 ** decimals : null;
   const liquidityAssets = liquidityUnits !== null && Number.isFinite(liquidityUnits) && liquidityUnits >= 0 && liquidityUnits < Number.MAX_SAFE_INTEGER ? BigInt(Math.floor(liquidityUnits)) : null;
   const limitedByLiquidity = mode === "withdraw" && liquidityAssets !== null && liquidityAssets < positionValue;
   const balance = mode === "deposit" ? position?.walletBalance ?? 0n : positionValue;

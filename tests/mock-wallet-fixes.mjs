@@ -46,10 +46,10 @@ function rpcHandler(delayMs = 0, simMode = null, badConfig = false, gateError = 
   };
 }
 
-async function setup(browser, { chain = "0x1237", rejectSwitch = false, delay = 0, apiDown = false, install = false, receiptStatus = null, path = "/", simMode = null, reject = false, badConfig = false, receiptError = false, liquidityUsd = 36000000, gateError = false } = {}) {
+async function setup(browser, { chain = "0x1237", rejectSwitch = false, delay = 0, apiDown = false, install = false, receiptStatus = null, path = "/", simMode = null, reject = false, badConfig = false, receiptError = false, liquidityUsd = 36000000, gateError = false, apiDelay = 0, noWallet = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
-  await page.addInitScript(({ ADDR, chain, rejectSwitch, reject }) => {
+  if (!noWallet) await page.addInitScript(({ ADDR, chain, rejectSwitch, reject }) => {
     window.__calls = []; window.__ls = {}; let cur = chain;
     window.ethereum = {
       request: async ({ method, params }) => {
@@ -80,7 +80,8 @@ async function setup(browser, { chain = "0x1237", rejectSwitch = false, delay = 
     }
     return base(route);
   });
-  if (liquidityUsd !== 36000000) await page.route("**/api/strategy", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ strategy: { address: "0xBeEff033F34C046626B8D0A041844C5d1A5409dd", name: "Steakhouse USDG", totalAssetsUsd: 492000000, liquidityUsd, sharePrice: 1.0078, netApy: 0.0391, avgNetApy: 0.0392, performanceFee: 0, managementFee: 0, listed: true, assetPriceUsd: 1 }, fetchedAt: new Date().toISOString() }) }));
+  if (liquidityUsd !== 36000000) await page.route("**/api/strategy", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ strategy: { address: "0xBeEff033F34C046626B8D0A041844C5d1A5409dd", name: "Steakhouse USDG", totalAssetsUsd: 492000000, liquidityUsd, totalAssets: 492000000, liquidity: liquidityUsd, sharePrice: 1.0078, netApy: 0.0391, avgNetApy: 0.0392, performanceFee: 0, managementFee: 0, listed: true, assetPriceUsd: 1 }, fetchedAt: new Date().toISOString() }) }));
+  if (apiDelay) await page.route("**/api/strategy", async (r) => { await new Promise((x) => setTimeout(x, apiDelay)); await r.continue(); });
   if (apiDown) await page.route("**/api/strategy", r => r.fulfill({ status: 503, body: '{"error":"x"}', contentType: "application/json" }));
   if (install) await page.clock.install();
   await page.goto(URL.replace(/\/$/, "") + path);
@@ -245,6 +246,33 @@ for (const [mode, expectWord, expectCta] of [[null, "Passed", /Withdraw USDG/], 
   status = "0x1"; await page.waitForTimeout(6000); // the approval now "confirms"
   const sent = (await page.evaluate(() => window.__calls)).filter((m) => m === "eth_sendTransaction").length;
   ok("O1 account switched during approval: only the approval was sent, no deposit followed", sent === 1, "eth_sendTransaction x" + sent);
+  await ctx.close(); }
+
+// P: no zero-looking value is ever shown for unknown data (skeleton while loading, "Unavailable" on failure)
+{ const { ctx, page } = await setup(browser, { apiDelay: 4000, noWallet: true }); await page.waitForTimeout(1200);
+  const strip = page.locator("section[aria-label='Vault metrics']");
+  const loading = await strip.innerText();
+  ok("P1 while metrics load: no digits and no % in the metric strip, skeletons shown", !/[0-9%]/.test(loading.replace(/0[1-4]/g, "")) && (await strip.locator(".skeleton").count()) >= 4, loading.replace(/\n+/g, " | ").slice(0, 110));
+  const all = await page.locator("main").innerText();
+  ok("P2 while loading: no '0.00' / '00.00' anywhere on Earn", !/0\.00|00\.00/.test(all.replace(/Balance[^\n]*/g, "")), (all.match(/\d*0\.00%?/g) || []).join(","));
+  await page.waitForTimeout(6000);
+  const loaded = await strip.innerText();
+  ok("P3 loaded: TVL and liquidity are in USDG (not % or $), fees read '0%'", /VAULT TVL[\s\S]*USDG/i.test(loaded) && !/TVL\s*\n?\s*\d+(\.\d+)?%/i.test(loaded) && /0% · 0%/.test(loaded), loaded.replace(/\n+/g, " | ").slice(0, 160));
+  ok("P4 loaded: no '0.00%' anywhere in the strip", !/0\.00%/.test(loaded));
+  await ctx.close(); }
+{ const { ctx, page } = await setup(browser, { apiDown: true, noWallet: true }); await page.waitForTimeout(3000);
+  const t = await page.locator("section[aria-label='Vault metrics']").innerText();
+  ok("P5 API down: the strip says Unavailable (4x) and shows no numbers", (t.match(/Unavailable/g) || []).length >= 4 && !/[0-9]+(\.[0-9]+)?%|USDG/.test(t.replace(/Net APY|Vault TVL|Liquidity|Vault fees|Management · performance|Variable · after vault fees|in USDG/g, "")), t.replace(/\n+/g, " | ").slice(0, 120));
+  await ctx.close(); }
+
+// Q: with no wallet, Yield Check is a single line; the full list appears after connecting
+{ const { ctx, page } = await setup(browser, { noWallet: true }); await page.waitForTimeout(2500);
+  const yc = await page.locator("#earn-module section[aria-labelledby=yc-title]").innerText();
+  ok("Q1 no wallet: Yield Check shows only 'Connect your wallet to run the checks.'", /Connect your wallet to run the checks\./.test(yc) && !/Where do the funds go/i.test(yc), yc.replace(/\n+/g, " | "));
+  await ctx.close(); }
+{ const { ctx, page } = await setup(browser); await page.waitForTimeout(2500);
+  const yc = await page.locator("#earn-module section[aria-labelledby=yc-title]").innerText();
+  ok("Q2 wallet connected: the full five-question list is shown", /Where do the funds go/i.test(yc) && /Are data and simulation current/i.test(yc));
   await ctx.close(); }
 
 await browser.close();

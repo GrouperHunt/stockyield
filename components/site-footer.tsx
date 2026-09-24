@@ -3,6 +3,8 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { DISCLAIMER, NON_AFFILIATION } from "@/lib/content";
 import { BrandMark } from "./brand-mark";
+import { TOKEN } from "@/lib/token";
+import { XLink } from "./x-link";
 import { useStockYield } from "./stockyield/provider";
 
 export function SiteFooter() {
@@ -32,6 +34,17 @@ export function SiteFooter() {
             <span className="text-2xl font-semibold tracking-[-0.04em]">StockYield</span>
           </button>
           <p className="mt-3 text-on-graphite-2">Put your onchain capital to work.</p>
+          <div className="mt-4 flex items-center gap-3"><XLink className="border-white/25 text-bg hover:bg-white/10" /><span className="text-sm text-on-graphite-2">Follow StockYield on X</span></div>
+          {TOKEN.address && (
+            <div className="mt-5 text-sm">
+              <p className="eyebrow">{TOKEN.symbol} token</p>
+              <p className="mt-1 break-all font-mono text-xs">{TOKEN.address}</p>
+              <div className="mt-1 flex gap-4">
+                <button type="button" onClick={() => navigator.clipboard?.writeText(TOKEN.address!)} className="underline-offset-4 hover:underline">Copy address</button>
+                <a className="underline-offset-4 hover:underline" href={`${info.explorer}/token/${TOKEN.address}`} target="_blank" rel="noreferrer">Explorer ↗</a>
+              </div>
+            </div>
+          )}
           <p role="status" aria-live="polite" className={`mt-2 h-5 font-mono text-xs text-signal transition-opacity duration-500 ${egg ? "opacity-100" : "opacity-0"}`}>{egg ? "Interest is just patience, paid." : ""}</p>
         </div>
         <div className="grid grid-cols-2 gap-6 text-sm">
