@@ -268,6 +268,19 @@ export default function StockYieldApp() {
   const withdrawAmountUsd = Number(amount || 0) * (strategy?.assetPriceUsd ?? 1);
   const liquidityHeadsUp = mode === "withdraw" && !!strategy && withdrawAmountUsd > strategy.liquidityUsd;
 
+  const switchable = !!address && !!provider && wrongNetwork;
+  const switchNetwork = async () => {
+    if (!provider) return;
+    setBusy(true);
+    try {
+      await ensureChain(provider);
+    } catch (e) {
+      toast.error("Network not switched", { description: describeTxError(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const transact = async () => {
     if (!TRANSACTIONS_ENABLED) {
       toast.error("Transactions are not enabled yet");
@@ -426,12 +439,12 @@ export default function StockYieldApp() {
               </div>
               <YieldCheck connected={!!address} data={!!strategy && !dataError && (!dataStale || mode === "withdraw")} gas={hasGas} amount={!amount || enough} gatesOpen={gatesOpen} network={!wrongNetwork} />
               <Button
-                disabled={!TRANSACTIONS_ENABLED || busy || !strategy || gatesOpen === false || (!!address && (!enough || !hasGas || depositBlockedByStaleData || wrongNetwork))}
-                onClick={transact}
+                disabled={switchable ? busy : !TRANSACTIONS_ENABLED || busy || gatesOpen === false || !strategy || (!!address && (!enough || !hasGas || depositBlockedByStaleData))}
+                onClick={switchable ? switchNetwork : transact}
                 className="mt-5 h-14 w-full rounded-[18px] bg-[#b7f24a] text-base font-semibold text-[#173f2c] hover:bg-[#c4fa5d] disabled:bg-white/20 disabled:text-white/45"
               >
                 {busy ? <LoaderCircle className="mr-2 animate-spin" /> : mode === "deposit" ? <ArrowDownToLine className="mr-2" size={19} /> : <ArrowUpRight className="mr-2" size={19} />}
-                {!TRANSACTIONS_ENABLED ? "Transactions pending validation" : gatesOpen === false ? "Vault gate active — paused" : !address ? "Connect wallet" : wrongNetwork ? "Switch network" : mode === "deposit" ? "Earn with USDG" : "Withdraw USDG"}
+                {switchable ? "Switch to Robinhood Chain" : !TRANSACTIONS_ENABLED ? "Transactions pending validation" : gatesOpen === false ? "Vault gate active — paused" : !address ? "Connect wallet" : mode === "deposit" ? "Earn with USDG" : "Withdraw USDG"}
               </Button>
               <p className="mt-4 text-center text-xs text-white/45">StockYield never receives or controls your funds.{gatesConfirmedOpen && " Verified open to any wallet — no allowlist."}</p>
             </TabsContent>
