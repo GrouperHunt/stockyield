@@ -1,121 +1,160 @@
 "use client";
-import { formatUnits, type Address } from "viem";
-import { ArrowDownToLine, ArrowUpRight, CircleDollarSign, Info, LoaderCircle } from "lucide-react";
+import { formatUnits } from "viem";
+import { ArrowDownToLine, ArrowUpRight, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TRANSACTIONS_ENABLED } from "@/lib/flags";
-import { cash, parseAmount, pct, sanitizeAmountInput } from "@/lib/format";
-import type { Position, StrategyInfo, StrategyMetrics, TxAction } from "@/lib/yield-strategy";
-import { Row } from "./atoms";
+import { cash, pct, sanitizeAmountInput, short } from "@/lib/format";
+import { useStockYield } from "./provider";
 import { YieldCheck } from "./yield-check";
 
-export type EarnModuleProps = {
-  info: StrategyInfo;
-  mode: TxAction;
-  onModeChange: (m: TxAction) => void;
-  amount: string;
-  onAmountChange: (v: string) => void;
-  metrics: StrategyMetrics | null;
-  dataError: boolean;
-  dataStale: boolean;
-  gatesOpen: boolean | null;
-  position: Position | null;
-  positionError: boolean;
-  address: Address | null;
-  hasProvider: boolean;
-  wrongNetwork: boolean;
-  busy: boolean;
-  onConnect: () => Promise<void>;
-  onSwitchNetwork: () => Promise<void>;
-  onRun: (action: TxAction, amount: bigint, hasShares: boolean) => Promise<void>;
-};
+function Dl({ rows }: { rows: [string, React.ReactNode][] }) {
+  return (
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+      {rows.map(([k, v]) => (
+        <div key={k}><dt className="eyebrow">{k}</dt><dd className="mt-1 font-medium">{v}</dd></div>
+      ))}
+    </dl>
+  );
+}
 
-export function EarnModule(p: EarnModuleProps) {
-  const { info, mode, amount, metrics, position, address, gatesOpen, busy } = p;
-  const decimals = info.asset.decimals;
-  const parsed = parseAmount(amount, decimals);
+const fmt = (v: bigint, decimals: number) => Number(formatUnits(v, decimals)).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-  // Withdraw ceiling uses the position's current value (shares converted to
-  // assets), not maxWithdraw: verified against the deployed vault's own
-  // source that maxWithdraw is a hardcoded `pure` function that always
-  // returns 0 in this Vault V2, so it cannot be used as a real ceiling. The
-  // actual on-chain constraint (real-time deallocatable liquidity) is instead
-  // caught by simulateContract right before a signature is requested.
-  const balance = mode === "deposit" ? position?.walletBalance ?? 0n : position?.assets ?? 0n;
-  const enough = parsed > 0n && parsed <= balance;
-  const hasShares = (position?.shares ?? 0n) > 0n;
-  const hasGas = (position?.ethBalance ?? 0n) > 0n;
-  const gatesConfirmedOpen = gatesOpen === true;
-  const depositBlockedByStaleData = mode === "deposit" && p.dataStale;
-  const withdrawAmountUsd = Number(amount || 0) * (metrics?.assetPriceUsd ?? 1);
-  const liquidityHeadsUp = mode === "withdraw" && !!metrics && withdrawAmountUsd > metrics.liquidityUsd;
-  const switchable = !!address && p.hasProvider && p.wrongNetwork;
+export function EarnModule() {
+  const s = useStockYield();
+  const { info, m, pos, wallet, tx, sim, mode, amount, decimals, parsed, balance, enough, hasShares, hasGas, limitedByLiquidity } = s;
+  const { address, wrongNetwork } = wallet;
+  const metrics = m.metrics;
+  const position = pos.position;
+  const price = metrics?.assetPriceUsd ?? null;
+  const busy = tx.busy || wallet.switching;
+  const switchable = !!address && !!wallet.provider && wrongNetwork;
+  const overBalance = parsed > 0n && parsed > balance;
+  const errId = "amount-error";
 
   const transact = async () => {
     if (!TRANSACTIONS_ENABLED) {
       toast.error("Transactions are not enabled yet");
       return;
     }
-    if (!address || !p.hasProvider) {
-      await p.onConnect();
+    if (!address || !wallet.provider) {
+      await wallet.connect();
       return;
     }
-    if (!enough || (mode === "deposit" && !metrics)) return;
-    if (depositBlockedByStaleData) {
-      toast.error("Vault data is stale", { description: "Refresh before depositing so you're not acting on outdated numbers." });
-      return;
-    }
-    if (gatesOpen === false) {
+    if (!enough || (mode === "deposit" && (!metrics || m.stale))) return;
+    if (m.configOk === false) return;
+    if (m.gatesOpen === false) {
       toast.error("A gate is currently active on this vault", { description: "Deposits or withdrawals may require allowlisting. Do not proceed until this is confirmed with Steakhouse/Morpho." });
       return;
     }
-    await p.onRun(mode, parsed, hasShares);
+    await s.run(mode, parsed, hasShares);
   };
 
+  // One label that always states why the button is (in)active.
+  const cta = (() => {
+    if (switchable) return { label: "Switch to Robinhood Chain", disabled: busy, onClick: wallet.switchNetwork };
+    const base = { onClick: transact };
+    if (!TRANSACTIONS_ENABLED) return { ...base, label: "Transactions pending validation", disabled: true };
+    if (m.gatesOpen === false) return { ...base, label: "Vault gate active — paused", disabled: true };
+    if (m.configOk === false) return { ...base, label: "Vault configuration mismatch", disabled: true };
+    if (!address) return { ...base, label: "Connect Wallet", disabled: busy };
+    if (!position) return { ...base, label: pos.error ? "Position unavailable — retry" : "Loading your balance…", disabled: true };
+    if (parsed === 0n) return { ...base, label: "Enter an amount", disabled: true };
+    if (!enough) return { ...base, label: mode === "deposit" ? "Amount exceeds your balance" : "Amount exceeds withdrawable", disabled: true };
+    if (!hasGas) return { ...base, label: "ETH needed for gas", disabled: true };
+    if (mode === "deposit" && !metrics) return { ...base, label: m.error ? "Vault data unavailable" : "Loading vault data…", disabled: true };
+    if (mode === "deposit" && m.stale) return { ...base, label: "Data outdated — refresh", disabled: true };
+    if (sim.status === "failed") return { ...base, label: "Simulation failed", disabled: true };
+    return { ...base, label: mode === "deposit" ? "Earn with USDG" : "Withdraw USDG", disabled: busy || sim.status === "checking" };
+  })();
+
+  const signatures =
+    mode === "withdraw" ? "1 signature: Withdraw USDG"
+    : sim.status === "passed" && sim.step === "approval" ? "2 signatures: Step 1 Approve USDG (limited to this amount) → Step 2 Deposit USDG"
+    : sim.status === "passed" && sim.step === "deposit" ? "1 signature: Deposit USDG (allowance already sufficient)"
+    : "1–2 signatures: Approve USDG (only if needed, limited to this amount), then Deposit USDG";
+
   return (
-    <aside className="self-start rounded-[30px] bg-[#173f2c] p-2 text-white shadow-[0_22px_55px_rgba(23,63,44,.22)] lg:sticky lg:top-6">
-      <Tabs value={mode} onValueChange={(v) => { p.onModeChange(v as TxAction); p.onAmountChange(""); }}>
-        <TabsList className="grid h-13 w-full grid-cols-2 rounded-[22px] bg-[#0f3021] p-1.5">
-          <TabsTrigger value="deposit" className="rounded-[17px] text-white/65 data-[state=active]:bg-white data-[state=active]:text-[#173f2c]">Deposit</TabsTrigger>
-          <TabsTrigger value="withdraw" className="rounded-[17px] text-white/65 data-[state=active]:bg-white data-[state=active]:text-[#173f2c]">Withdraw</TabsTrigger>
-        </TabsList>
-        <TabsContent value={mode} className="m-0 p-5 pt-7 md:p-7">
-          <div className="flex justify-between text-sm text-white/65">
-            <span>{mode === "deposit" ? "Wallet balance" : "Available to withdraw"}</span>
-            <span>{position ? `${Number(formatUnits(balance, decimals)).toLocaleString(undefined, { maximumFractionDigits: 2 })} USDG` : p.positionError ? "Unavailable" : address ? "Loading…" : "Connect wallet"}</span>
+    <div id="earn-module" className="border bg-surface shadow-[0_1px_0_rgba(23,26,23,.04),0_8px_24px_-12px_rgba(23,26,23,.12)]">
+      <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
+        <h2 className="text-lg font-semibold tracking-tight">Earn with USDG</h2>
+        <div role="group" aria-label="Action" className="inline-flex border bg-surface p-0.5">
+          {(["deposit", "withdraw"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={mode === v}
+              onClick={() => { s.setMode(v); s.setAmount(""); }}
+              className={`h-8 px-3 text-sm capitalize transition-colors ${mode === v ? "bg-ink text-bg" : "hover:bg-surface-2"}`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-5 p-5">
+        <Dl rows={[["Vault", info.name], ["Protocol", info.protocol], ["Network", info.network], ["Asset", info.asset.symbol]]} />
+
+        <div>
+          <div className="flex items-baseline justify-between text-sm">
+            <label htmlFor="amount" className="eyebrow">{mode === "deposit" ? "Amount to deposit" : "Amount to withdraw"}</label>
+            <span className="num text-ink-2">
+              {mode === "deposit" ? "Balance " : limitedByLiquidity ? "Withdrawable (liquidity-limited) " : "Position value "}
+              {position ? <>{fmt(balance, decimals)} USDG</> : pos.error ? "Unavailable" : address ? <span className="skeleton">0.00 USDG</span> : "—"}
+            </span>
           </div>
-          <div className="mt-4 rounded-[22px] border border-white/12 bg-white/[.06] p-5">
-            <div className="flex items-center gap-3">
-              <input aria-label="Amount" inputMode="decimal" value={amount} onChange={(e) => p.onAmountChange(sanitizeAmountInput(e.target.value, decimals))} placeholder="0.00" className="min-w-0 flex-1 bg-transparent text-4xl outline-none placeholder:text-white/25" />
-              <span className="flex items-center gap-2 rounded-full bg-white px-3 py-2 font-semibold text-[#173f2c]"><CircleDollarSign size={17} />USDG</span>
-            </div>
-            <div className="mt-5 flex justify-between">
-              <span className="text-sm text-white/45">≈ {cash(Number(amount || 0) * (metrics?.assetPriceUsd ?? 1))}</span>
-              <button disabled={!position} onClick={() => p.onAmountChange(formatUnits(balance, decimals))} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold">MAX</button>
-            </div>
+          <div className={`mt-2 flex items-center gap-3 border bg-surface px-4 py-3 transition-colors focus-within:border-ink ${overBalance ? "border-danger" : ""}`}>
+            <input
+              id="amount"
+              aria-label="Amount"
+              aria-invalid={overBalance}
+              aria-describedby={overBalance ? errId : undefined}
+              inputMode="decimal"
+              autoComplete="off"
+              value={s.amount}
+              onChange={(e) => s.setAmount(sanitizeAmountInput(e.target.value, decimals))}
+              placeholder="0.00"
+              className="num min-w-0 flex-1 bg-transparent text-3xl font-medium tracking-tight outline-none placeholder:text-ink-2/40"
+            />
+            <span className="font-mono text-sm">USDG</span>
+            <button type="button" disabled={!position} onClick={() => s.setAmount(formatUnits(balance, decimals))} className="border px-2 py-1 font-mono text-xs uppercase transition-colors hover:bg-surface-2 active:translate-y-px disabled:opacity-40">Max</button>
           </div>
-          {liquidityHeadsUp && (
-            <p className="mt-3 flex items-start gap-2 text-xs text-[#f3d17a]"><Info size={14} className="mt-0.5 shrink-0" />This is more than the vault&apos;s last reported available liquidity ({cash(metrics?.liquidityUsd ?? 0, 0)}). It may still work if liquidity has since changed, or it may need to be split into smaller withdrawals.</p>
+          <div className="mt-2 flex justify-between text-xs text-ink-2">
+            <span className="num">{price !== null ? <>≈ {cash(Number(amount || 0) * price)}</> : "USD value unavailable"}</span>
+            {mode === "withdraw" && limitedByLiquidity && <span>Limited by last reported liquidity</span>}
+          </div>
+          {overBalance && (
+            <p id={errId} role="alert" className="mt-2 text-sm text-danger">
+              {mode === "deposit" ? "Amount exceeds your USDG balance." : limitedByLiquidity ? "Amount exceeds what the last reported liquidity allows." : "Amount exceeds your position value."}
+            </p>
           )}
-          <div className="my-6 space-y-3 text-sm">
-            <Row l="Current APY" v={pct(metrics?.netApy)} />
-            {mode === "deposit" && <Row l="Estimated annual yield" v={cash(Number(amount || 0) * (metrics?.netApy ?? 0))} />}
-            <Row l="Destination" v="Steakhouse · Morpho" />
-            <Row l="Network fee" v="Paid in ETH, shown in your wallet before you sign" />
-          </div>
-          <YieldCheck connected={!!address} data={mode === "withdraw" || (!!metrics && !p.dataError && !p.dataStale)} gas={hasGas} amount={!amount || enough} gatesOpen={gatesOpen} network={!p.wrongNetwork} />
-          <Button
-            disabled={switchable ? busy : !TRANSACTIONS_ENABLED || busy || gatesOpen === false || (mode === "deposit" && !metrics) || (!!address && (!enough || !hasGas || depositBlockedByStaleData))}
-            onClick={switchable ? p.onSwitchNetwork : transact}
-            className="mt-5 h-14 w-full rounded-[18px] bg-[#b7f24a] text-base font-semibold text-[#173f2c] hover:bg-[#c4fa5d] disabled:bg-white/20 disabled:text-white/45"
-          >
-            {busy ? <LoaderCircle className="mr-2 animate-spin" /> : mode === "deposit" ? <ArrowDownToLine className="mr-2" size={19} /> : <ArrowUpRight className="mr-2" size={19} />}
-            {switchable ? "Switch to Robinhood Chain" : !TRANSACTIONS_ENABLED ? "Transactions pending validation" : gatesOpen === false ? "Vault gate active — paused" : !address ? "Connect wallet" : mode === "deposit" ? "Earn with USDG" : "Withdraw USDG"}
-          </Button>
-          <p className="mt-4 text-center text-xs text-white/45">StockYield never receives or controls your funds.{gatesConfirmedOpen && " Verified open to any wallet — no allowlist."}</p>
-        </TabsContent>
-      </Tabs>
-    </aside>
+        </div>
+
+        <Dl
+          rows={[
+            ["Current net APY (variable)", <span key="a" className="num">{m.error && !metrics ? "Unavailable" : metrics ? pct(metrics.netApy) : <span className="skeleton">0.00%</span>}</span>],
+            mode === "deposit"
+              ? ["Estimated annual yield", <span key="y" className="num">{metrics ? cash(Number(amount || 0) * metrics.netApy) : "Unavailable"}</span>]
+              : ["You receive (estimate)", <span key="r" className="num">{parsed > 0n ? `≈ ${fmt(parsed, decimals)} USDG` : "—"}</span>],
+            ...(mode === "withdraw" ? ([["Recipient", address ? <span key="d" className="num">{short(address)} (your wallet)</span> : "—"]] as [string, React.ReactNode][]) : []),
+          ]}
+        />
+
+        <YieldCheck />
+
+        <p className="text-xs text-ink-2">{signatures}</p>
+
+        <Button
+          disabled={cta.disabled}
+          onClick={cta.onClick}
+          className="group h-14 w-full rounded-sm bg-signal text-base font-semibold text-ink transition-[transform,background-color] hover:bg-signal/90 active:translate-y-px disabled:bg-surface-2 disabled:text-ink-2 disabled:opacity-100"
+        >
+          {busy || (sim.status === "checking" && cta.label.startsWith("Earn")) ? <LoaderCircle className="animate-spin" /> : mode === "deposit" ? <ArrowDownToLine /> : <ArrowUpRight className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />}
+          {cta.label}
+        </Button>
+        <p className="text-center text-xs text-ink-2">StockYield never receives or controls your funds. You sign every transaction in your wallet.</p>
+      </div>
+    </div>
   );
 }

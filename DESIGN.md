@@ -100,7 +100,7 @@ Waiting for wallet (pulsing ring) · Submitted (hash + explorer link, indetermin
 
 **Navigation**: sticky, 72px, bg `--bg` at 92% + blur 8px, bottom hairline; Logo | Earn | Position | How it works | Risks | (network chip) Robinhood Chain | Connect Wallet. Active page: 2px `--ink` underline. Mobile: menu button → full-height sheet; wallet button always visible; network chip visible on mobile too.
 
-**Tabs (Deposit/Withdraw)**: segmented, 1px border, active = `--ink` fill/`--bg` text.
+**Deposit / Withdraw switch**: segmented control of two buttons (`aria-pressed`), 1px border, active = `--ink` fill/`--bg` text. (Radix Tabs were dropped: their `aria-controls` pointed at panels that don't exist and failed the accessibility audit.)
 
 **Skeleton**: `--surface-2` blocks with a slow 1.6s shimmer; same dimensions as final content to prevent layout shift.
 
@@ -112,7 +112,7 @@ Waiting for wallet (pulsing ring) · Submitted (hash + explorer link, indetermin
 
 ### Brand assets (delivered in `stockyield-brand/`, linked, never modified)
 - `favicon.ico`, `apple-touch-icon.png` (180), `icon-192.png`, `icon-512.png` → site icons via Next metadata.
-- `logo-transparent.png` → `<BrandMark />`, the single swappable logo component used in the header and as the start node of the funds path. The token logo is still being redesigned: replacing the file (or the one `src` inside `BrandMark`) must update both places, with no other code change.
+- `logo-transparent.png` → `<BrandMark />` (`components/brand-mark.tsx`), the single swappable logo component used in the header and footer; the funds-path SVG reads the same `LOGO_SRC` constant from that file. The token logo is still being redesigned: replacing the file (or the one `src` inside `BrandMark`) must update both places, with no other code change.
 - `banner-x-1500x500.png` → Open Graph / Twitter share preview.
 - `logo-mint-1024.png` → reference only (mint background version).
 Files are copied unchanged into `public/brand/`; StockYield never redraws or recolors them.
@@ -143,7 +143,7 @@ Principles: sober, purposeful, short. It is a place where money is deposited: mo
 Observed on the reference (rhythm to reuse, not content): sticky header with a 2px scroll-progress line; hero headline clip-path reveal (`headline-reveal`, ~0.9s) with muted second line; content `rise` (opacity + translateY 17px, 0.85s) on scroll-in; rows `row-enter` (translateY 8px, 0.45s, staggered); tab settle (scale .96→1); line-draw `scaleX(0→1)` 1s; a "gate scan" clip-path fill on validation cells; dialogs `dialog-enter` (translateY 25px + scale .97); drawers slide from the right; dark inverted section in the middle of the page.
 
 StockYield motion set (CSS first, zero new dependencies; one ~40-line `useInView`/`useScrollProgress` hook using IntersectionObserver and rAF):
-1. **Opening (≤1.4s, skippable)**: header fades in; H1 line 1 clip-reveals, line 2 follows (staggered 120ms); the funds-path begins drawing. Any click/keypress/scroll skips to the final state. Plays once per session (sessionStorage); disabled entirely under `prefers-reduced-motion`.
+1. **Opening (~1 s, skippable)** *(as built)*: header fades in; H1 line 1 clip-reveals, line 2 follows (100ms later); subtitle, chips and the Earn module rise in. It ends by itself after 1 s (measured 0.9 s). Any click / key / wheel / touch skips it at once, even before the page hydrates (the logic lives in a tiny inline script in `<head>`). Plays once per session (sessionStorage); off entirely under `prefers-reduced-motion`. The funds path is not part of the intro: it animates with scroll.
 2. **Funds path (the site's image)**: inline SVG. Nodes left→right (top→bottom on mobile): *StockYield interface (logo mark, start)* · *Your wallet* · *Steakhouse USDG vault* · *Morpho lending markets* · *Borrowers*. The path draws with scroll (`stroke-dashoffset` bound to a `--p` CSS variable, 0→1 across the section); each node lights (fill + label) as `--p` passes it; small flat dots travel along the funds path; a dotted return line labelled "interest" flows back from Borrowers to the vault. The StockYield node connects to the wallet with a **dashed "prepares & simulates" line only**: the solid funds line goes wallet → vault directly, so the diagram never implies funds pass through StockYield. Partner names are text only, no logos. Reduced motion: fully drawn, static.
 3. **Section reveals**: `rise` on scroll-in (IntersectionObserver, once), stagger 60ms for grouped cells.
 4. **Micro-interactions**: button hover arrow nudge; input focus border draw; MAX chip press; stat numbers crossfade (opacity 200ms) when refreshed (no counting-up: no fake counters); step indicator segment fills when a step completes; Yield Check row sweep (see §4).
@@ -194,3 +194,8 @@ Prompts
 - "Build the funds-path SVG: interface node dashed to wallet; solid path wallet → vault → markets → borrowers; interest return line; scroll-bound draw via --p; static under reduced motion; text names only."
 - "Build the stat strip: four hairline cells, mono index, tabular value, skeleton and Unavailable+Retry states."
 - Never add: partner logos, score/verified badges, invented data, decorative charts.
+
+## 11. As built (implementation notes)
+- Pages: `/` Earn · `/position` · `/how-it-works` · `/risks` (Risks & FAQ). Wallet, metrics, position, simulation and transaction state live in one provider (`components/stockyield/provider.tsx`) so they persist across pages.
+- Motion is CSS-first with zero new dependencies: keyframes + IntersectionObserver `Reveal`, a scroll-progress CSS variable (`--p`) for the funds path, SMIL `animateMotion` for the travelling dots (hidden under reduced motion).
+- Checked in Chromium and WebKit (Safari engine). Not checked in Firefox.

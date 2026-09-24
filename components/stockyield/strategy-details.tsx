@@ -1,46 +1,82 @@
-import { CircleDollarSign, Clock3, ExternalLink, Landmark, LockKeyhole, RefreshCw } from "lucide-react";
+"use client";
+import { ExternalLink } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cash, pct, short } from "@/lib/format";
-import type { StrategyInfo, StrategyMetrics } from "@/lib/yield-strategy";
-import { Detail, Risk } from "./atoms";
+import { useStockYield } from "./provider";
 
-export function StrategyDetails({ open, onOpenChange, info, metrics }: { open: boolean; onOpenChange: (o: boolean) => void; info: StrategyInfo; metrics: StrategyMetrics | null }) {
+function Row({ k, children }: { k: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-1 border-t py-3 first:border-t-0 sm:grid-cols-[13rem_1fr] sm:gap-4">
+      <dt className="eyebrow pt-0.5">{k}</dt>
+      <dd className="text-sm">{children}</dd>
+    </div>
+  );
+}
+const ext = "inline-flex items-center gap-1 font-medium text-signal-ink underline-offset-4 hover:underline";
+const time = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "Unavailable");
+
+export function StrategyDetailsContent() {
+  const { info, m, pos } = useStockYield();
+  const x = m.metrics;
+  const Unavailable = <span className="text-ink-2">Unavailable</span>;
+  return (
+    <div className="space-y-8">
+      <section>
+        <h3 className="mb-2 text-base font-semibold">Strategy</h3>
+        <dl className="border-y">
+          <Row k="Vault">{info.name}</Row>
+          <Row k="Protocol">{info.protocol}</Row>
+          <Row k="Network">{info.network} · chain ID <span className="num">{info.chainId}</span></Row>
+          <Row k="Asset">{info.asset.symbol} · <span className="num">{info.asset.decimals}</span> decimals · shares <span className="num">{info.shareDecimals}</span> decimals</Row>
+        </dl>
+      </section>
+      <section>
+        <h3 className="mb-2 text-base font-semibold">Contracts</h3>
+        <dl className="border-y">
+          <Row k="Vault"><a className={ext} href={`${info.explorer}/address/${info.vault}`} target="_blank" rel="noreferrer"><code className="num break-all">{info.vault}</code><ExternalLink size={13} /></a></Row>
+          <Row k="USDG"><a className={ext} href={`${info.explorer}/address/${info.asset.address}`} target="_blank" rel="noreferrer"><code className="num break-all">{info.asset.address}</code><ExternalLink size={13} /></a></Row>
+          <Row k="Explorer"><a className={ext} href={info.explorer} target="_blank" rel="noreferrer">Robinhood Chain explorer<ExternalLink size={13} /></a></Row>
+          <Row k="Documentation"><a className={ext} href={info.docsUrl} target="_blank" rel="noreferrer">{info.vaultDocsNote}<ExternalLink size={13} /></a></Row>
+          <Row k="Strategy page"><a className={ext} href={info.strategyUrl} target="_blank" rel="noreferrer">Vault on Morpho<ExternalLink size={13} /></a></Row>
+        </dl>
+        <p className="mt-2 text-xs text-ink-2">Addresses come from StockYield&apos;s verified configuration and were checked on-chain (vault asset, decimals).</p>
+      </section>
+      <section>
+        <h3 className="mb-2 text-base font-semibold">Live metrics</h3>
+        <dl className="border-y">
+          <Row k="Net APY (variable)"><span className="num">{x ? pct(x.netApy) : Unavailable}</span><span className="block text-xs text-ink-2">Current rate after vault fees, including rewards (Morpho API definition).</span></Row>
+          <Row k="Average net APY"><span className="num">{x ? pct(x.avgNetApy) : Unavailable}</span><span className="block text-xs text-ink-2">Realized average after fees, including rewards, over Morpho&apos;s default lookback (6 hours, per its API documentation).</span></Row>
+          <Row k="Vault TVL"><span className="num">{x ? cash(x.totalAssetsUsd, 0) : Unavailable}</span><span className="block text-xs text-ink-2">Total assets in this vault. Not the amount deposited through StockYield.</span></Row>
+          <Row k="Liquidity reported by API"><span className="num">{x ? cash(x.liquidityUsd, 0) : Unavailable}</span><span className="block text-xs text-ink-2">Idle assets plus liquidity in the vault&apos;s liquidity adapter, as reported by Morpho. It is not a promise of what you can withdraw: that is checked by simulation.</span></Row>
+          <Row k="Vault fees"><span className="num">{x ? `management ${(x.managementFee * 100).toFixed(2)}% · performance ${(x.performanceFee * 100).toFixed(2)}%` : Unavailable}</span></Row>
+          <Row k="StockYield fee">0% — StockYield does not charge a fee.</Row>
+          <Row k="Network fee">Paid by you in ETH; estimated in Yield Check, final amount shown by your wallet.</Row>
+        </dl>
+      </section>
+      <section>
+        <h3 className="mb-2 text-base font-semibold">Sources and timestamps</h3>
+        <dl className="border-y">
+          <Row k="Metrics source">Morpho API (api.morpho.org/graphql), normalized and validated by StockYield&apos;s /api/strategy route.</Row>
+          <Row k="Metrics fetched"><span className="num">{time(m.fetchedAt)}</span><span className="block text-xs text-ink-2">The time StockYield fetched them, not the time Morpho last indexed them.</span></Row>
+          <Row k="Position and balances">Read directly on-chain from Robinhood Chain (public RPC). Last read: <span className="num">{time(pos.updatedAt)}</span></Row>
+          <Row k="Vault address (short)"><code className="num">{short(info.vault)}</code></Row>
+        </dl>
+      </section>
+    </div>
+  );
+}
+
+export function StrategyDetailsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const { info } = useStockYield();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto bg-[#f8faf5] p-0 sm:max-w-xl">
-        <SheetHeader className="border-b p-7 text-left">
-          <SheetTitle className="text-3xl">{info.name}</SheetTitle>
-          <SheetDescription>A curated Morpho Vault V2 on Robinhood Chain.</SheetDescription>
+      <SheetContent className="w-full overflow-y-auto bg-bg p-0 sm:max-w-xl">
+        <SheetHeader className="border-b p-6 text-left">
+          <p className="eyebrow">Strategy details</p>
+          <SheetTitle className="text-3xl font-medium tracking-tight">{info.name}</SheetTitle>
+          <SheetDescription>A curated Morpho Vault V2 on {info.network}.</SheetDescription>
         </SheetHeader>
-        <div className="space-y-8 p-7">
-          <section>
-            <h3 className="font-semibold">Live strategy data</h3>
-            <div className="mt-4 divide-y rounded-2xl border bg-white px-4">
-              <Detail l="Net APY" v={pct(metrics?.netApy)} />
-              <Detail l="Average net APY (trailing, window set by Morpho)" v={pct(metrics?.avgNetApy)} />
-              <Detail l="Total deposits" v={metrics ? cash(metrics.totalAssetsUsd, 0) : "—"} />
-              <Detail l="Available liquidity" v={metrics ? cash(metrics.liquidityUsd, 0) : "—"} />
-              <Detail l="Management fee" v={metrics ? `${(metrics.managementFee * 100).toFixed(2)}%` : "—"} />
-              <Detail l="Performance fee" v={metrics ? `${(metrics.performanceFee * 100).toFixed(2)}%` : "—"} />
-              <Detail l="StockYield fee" v="0% — StockYield does not charge a fee" />
-              <Detail l="Network gas" v="Paid by you, in ETH, set by the network" />
-            </div>
-          </section>
-          <section>
-            <h3 className="font-semibold">What can change</h3>
-            <div className="mt-4 space-y-3">
-              <Risk i={<RefreshCw />} t="Variable APY" d="Borrow demand and utilization change over time; past yield does not guarantee future yield." />
-              <Risk i={<LockKeyhole />} t="Smart contract risk" d="Funds interact with Morpho Vault V2 and the lending markets it allocates to. A bug in any of these contracts could result in loss of funds." />
-              <Risk i={<Clock3 />} t="Liquidity and withdrawal risk" d="If most vault liquidity is deployed to borrowers, a withdrawal can be delayed until liquidity is available. Every withdrawal is simulated before you are asked to sign, and you are told if it would fail; the app does not show a guaranteed withdrawable amount." />
-              <Risk i={<Landmark />} t="Curator and collateral risk" d="Steakhouse selects markets and allocation limits, but cannot eliminate the underlying risk of the markets it chooses. If a borrower's collateral is not liquidated in time to cover their debt, the resulting bad debt can reduce what lenders can withdraw." />
-              <Risk i={<CircleDollarSign />} t="USDG depeg risk" d="USDG is intended to track $1 but its market price can deviate from that peg. This app converts your position using the live USDG/USD price when depositing and valuing your position." />
-            </div>
-          </section>
-          <a href={`${info.explorer}/address/${info.vault}`} target="_blank" className="flex items-center justify-between rounded-2xl border bg-white p-4 text-sm">
-            <span><small className="block text-[#718078]">Vault contract</small><code>{short(info.vault)}</code></span>
-            <ExternalLink size={17} />
-          </a>
-        </div>
+        <div className="p-6"><StrategyDetailsContent /></div>
       </SheetContent>
     </Sheet>
   );

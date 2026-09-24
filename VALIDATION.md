@@ -87,6 +87,29 @@ Errori miei, trovati confrontando il sito con il brief. Ora corretti e provati c
 
 Riproduzione dei punti 1–4: `tests/mock-wallet-fixes.mjs` (12 controlli, tutti superati; vedi l'intestazione del file per come eseguirli). Limite: il wallet è un oggetto JavaScript finto e l'RPC è intercettato: prova la logica dell'interfaccia, non la chain né un wallet reale.
 
+## Redesign a 4 pagine (branch `redesign`, 24/09/2026) — cosa è stato provato davvero
+
+Tutte le prove sotto sono su una build locale di produzione, con wallet e RPC **finti** (nessuna chiave, nessun fondo, nessuna transazione reale), tranne dove indicato "chain reale" (sola lettura).
+
+**Test automatici riproducibili**
+- `tests/mock-wallet-fixes.mjs`: 25 controlli, tutti superati. Cambio rete (accettato/rifiutato); API Morpho giù (prelievo attivo, deposito bloccato); receipt che non arriva ("Still pending"); posizione in caricamento senza zeri; receipt in revert (testo del toast catturato: "Transaction not completed — The withdrawal transaction reverted on-chain."); disconnessione con lettura in corso (verificato come mutation: il test fallisce senza la correzione e passa con); cambio account durante un'operazione; simulazione Passed / Failed / Unavailable in Yield Check con CTA coerente; firma rifiutata ("Rejected by user", nessun toast di errore); deposito in due step con ri-simulazione dopo l'approve; asset on-chain diverso dalla configurazione (CTA bloccato).
+- `tests/motion-checks.mjs`: 14 controlli, tutti superati. Animazione d'apertura 0,9 s e saltabile con un tasto/click/rotella (anche prima dell'idratazione); non si ripete nella stessa sessione; con `prefers-reduced-motion` nessuna intro, funds path già disegnato, puntini nascosti, blocchi visibili; il funds path segue lo scroll (--p da 0 a 0,8 entrando in vista); easter egg (tripla pressione sul wordmark del footer) mostra la scritta, poi sparisce, senza errori; primo Tab = "Skip to content", focus sempre visibile.
+- Lighthouse (build locale, desktop e mobile, 4 pagine): Accessibilità 100, Best practices 100, SEO 100 su tutte. Un primo giro aveva dato 96–98: `aria-valid-attr-value` (i tab Radix puntavano a pannelli inesistenti, ora sostituiti da due pulsanti `aria-pressed`) e `heading-order` in How it works (corretto).
+- Nessuno scroll orizzontale a 375 px su tutte le 4 pagine, anche con wallet finto collegato, importo inserito e finestra di transazione aperta. Un "grid blowout" a 390 px trovato nel primo giro è stato corretto.
+- Chain reale (sola lettura): dalla pagina Earn locale, "Vault asset is USDG (6 decimals)", "No allowlist gate on the vault" e "Vault data" risultano Passed; APY, Vault TVL e liquidità arrivano dall'API Morpho.
+- Motore Safari (WebKit) e Chromium: funds path animato correttamente e nessun overflow. **Firefox non provato.**
+
+**Prima di dichiarare "eseguito" ogni voce sopra ricorda i limiti**: il wallet è un oggetto JavaScript finto e l'RPC è intercettato, quindi provano la logica dell'interfaccia, non la chain né un wallet reale.
+
+**Non provato (richiede te o altro ambiente)**
+- Nessun ciclo connect → approve → deposit → posizione → withdraw con un wallet reale sul sito pubblicato. È l'unico test che chiude il criterio di completamento del brief.
+- Nessun dispositivo mobile fisico; nessuna estensione wallet reale (MetaMask/Rabby/Coinbase), quindi l'ordine degli eventi reali di `accountsChanged`/`chainChanged` è coperto solo dal wallet finto.
+- La stima del fee di rete usa `estimateGas` × `gasPrice` letti dall'RPC pubblico: con la chain reale il valore mostrato dal wallet può differire; il fee del deposito prima dell'approve non è stimabile (viene stimato dopo).
+- Lighthouse è stato eseguito in locale, non sull'URL Vercel (protetto da login).
+- Il link "Documentation" (docs.morpho.org) è la documentazione generale di Morpho, non una pagina specifica del vault: non ho trovato un URL più preciso che potessi verificare.
+
+**Note sui dati mostrati (fonte: descrizioni ufficiali dello schema GraphQL di Morpho, lette via introspezione il 24/09/2026)**: `netApy` = "Current net APY of the vault (after fees, including rewards)"; `avgNetApy` = media realizzata dopo commissioni e reward su un periodo di lookback (default 6 ore); `liquidity` = liquidità dell'adapter di liquidità + asset idle; `totalAssetsUsd` = asset totali nel vault (mostrato come "Vault TVL").
+
 ## Riepilogo modifiche di questa sessione
 1. Rimosso l'uso di `maxDeposit`/`maxWithdraw` come blocco/limite (bug che avrebbe reso impossibile ogni deposito e mostrato sempre "0" disponibile per il prelievo) — sostituito con lettura diretta dei quattro gate (`gateAbi` in [lib/vault.ts](lib/vault.ts)) e con il saldo posizione reale (`convertToAssets`) come base per il prelievo.
 2. Aggiunta la verifica periodica (ogni 5 minuti) dello stato dei gate, con blocco esplicito e messaggio chiaro se un gate viene attivato in futuro.
