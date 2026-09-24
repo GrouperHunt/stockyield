@@ -1,0 +1,1 @@
+export const TRANSACTIONS_ENABLED = process.env.NEXT_PUBLIC_ENABLE_TRANSACTIONS === "true";

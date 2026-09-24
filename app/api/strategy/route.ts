@@ -1,4 +1,5 @@
-import { CHAIN_ID, VAULT, parseStrategy } from "@/lib/vault";
+import { CHAIN_ID, VAULT } from "@/lib/strategies/steakhouse-usdg/config";
+import { parseMetrics } from "@/lib/strategies/steakhouse-usdg/metrics";
 
 // Edge runtime is deprecated on the current Next.js version; this route has no
 // edge-specific requirement, so it runs on the standard nodejs runtime.
@@ -24,7 +25,7 @@ export async function GET() {
     if (!response.ok) throw new Error(`Morpho API responded with status ${response.status}`);
     const json = (await response.json()) as { data?: { vaultV2ByAddress?: unknown }; errors?: unknown[] };
     if (json.errors?.length) throw new Error("Morpho API returned an error");
-    const strategy = parseStrategy(json.data?.vaultV2ByAddress);
+    const strategy = parseMetrics(json.data?.vaultV2ByAddress);
     if (!strategy) throw new Error("Unexpected vault data shape");
     if (!strategy.listed) throw new Error("Vault is no longer listed by Morpho");
 
