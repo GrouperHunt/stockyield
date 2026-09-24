@@ -510,7 +510,7 @@ export default function StockYieldApp() {
               <div className="mt-4 space-y-3">
                 <Risk i={<RefreshCw />} t="Variable APY" d="Borrow demand and utilization change over time; past yield does not guarantee future yield." />
                 <Risk i={<LockKeyhole />} t="Smart contract risk" d="Funds interact with Morpho Vault V2 and the lending markets it allocates to. A bug in any of these contracts could result in loss of funds." />
-                <Risk i={<Clock3 />} t="Liquidity and withdrawal risk" d="If most vault liquidity is deployed to borrowers, a withdrawal can be delayed until liquidity is available. This app shows your live withdrawable amount before you submit." />
+                <Risk i={<Clock3 />} t="Liquidity and withdrawal risk" d="If most vault liquidity is deployed to borrowers, a withdrawal can be delayed until liquidity is available. Every withdrawal is simulated before you are asked to sign, and you are told if it would fail; the app does not show a guaranteed withdrawable amount." />
                 <Risk i={<Landmark />} t="Curator and collateral risk" d="Steakhouse selects markets and allocation limits, but cannot eliminate the underlying risk of the markets it chooses. If a borrower's collateral is not liquidated in time to cover their debt, the resulting bad debt can reduce what lenders can withdraw." />
                 <Risk i={<CircleDollarSign />} t="USDG depeg risk" d="USDG is intended to track $1 but its market price can deviate from that peg. This app converts your position using the live USDG/USD price when depositing and valuing your position." />
               </div>
