@@ -10,13 +10,15 @@ const w = (n) => "0x" + BigInt(n).toString(16).padStart(64, "0");
 let results = [];
 const ok = (name, cond, extra = "") => { results.push([cond ? "PASS" : "FAIL", name, extra]); console.log(cond ? "[PASS]" : "[FAIL]", name, extra); };
 
-function rpcHandler(delayMs = 0, simMode = null, badConfig = false) {
+let blockTick = 0;
+function rpcHandler(delayMs = 0, simMode = null, badConfig = false, gateError = false) {
   const one = (r) => {
     const { method, params, id } = r; let result = null;
     if (method === "eth_chainId") result = "0x1237";
-    else if (method === "eth_blockNumber") result = "0x10";
+    else if (method === "eth_blockNumber") result = "0x" + (16 + blockTick++).toString(16); // advances so viem keeps polling for receipts
     else if (method === "eth_getBalance") result = w(10n ** 18n);
     else if (method === "eth_getTransactionReceipt") result = null;
+    else if (method === "eth_getTransactionByHash") result = { hash: params[0], from: ADDR, to: "0xBeEff033F34C046626B8D0A041844C5d1A5409dd", nonce: "0x1", blockHash: null, blockNumber: null, transactionIndex: null, input: "0x", value: "0x0", gas: "0x30000", gasPrice: "0x1", type: "0x0", chainId: "0x1237", v: "0x0", r: "0x1", s: "0x1" }; // pending tx, so viem keeps waiting
     else if (method === "eth_getBlockByNumber") result = { number: "0x10", hash: "0x" + "1".repeat(64), timestamp: "0x1", baseFeePerGas: "0x1", transactions: [], gasLimit: "0x1c9c380", parentHash: "0x" + "0".repeat(64) };
     else if (method === "eth_call") {
       const to = params[0].to.toLowerCase(), d = (params[0].data || params[0].input || "").slice(0, 10);
@@ -25,7 +27,7 @@ function rpcHandler(delayMs = 0, simMode = null, badConfig = false) {
       else if (d === "0xdd62ed3e") result = w(0);
       else if (d === "0x38d52e0f") result = "0x" + "0".repeat(24) + (badConfig ? "2".repeat(40) : USDG.slice(2)); // vault.asset()
       else if (d === "0x313ce567") result = w(6); // USDG.decimals()
-      else if (["0x7e729ac4","0x93ab2ab7","0x54cde13e","0x8eede801"].includes(d)) result = zero32;
+      else if (["0x7e729ac4","0x93ab2ab7","0x54cde13e","0x8eede801"].includes(d)) { if (gateError) return { jsonrpc: "2.0", id, error: { code: -32000, message: "gate read failed" } }; result = zero32; }
       else if (simMode && ["0xb460af94", "0x6e553f65", "0x095ea7b3"].includes(d)) {
         return simMode === "revert"
           ? { jsonrpc: "2.0", id, error: { code: 3, message: "execution reverted", data: "0x4e487b71" + "0".repeat(62) + "11" } }
@@ -44,7 +46,7 @@ function rpcHandler(delayMs = 0, simMode = null, badConfig = false) {
   };
 }
 
-async function setup(browser, { chain = "0x1237", rejectSwitch = false, delay = 0, apiDown = false, install = false, receiptStatus = null, path = "/", simMode = null, reject = false, badConfig = false } = {}) {
+async function setup(browser, { chain = "0x1237", rejectSwitch = false, delay = 0, apiDown = false, install = false, receiptStatus = null, path = "/", simMode = null, reject = false, badConfig = false, receiptError = false, liquidityUsd = 36000000, gateError = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   await page.addInitScript(({ ADDR, chain, rejectSwitch, reject }) => {
@@ -66,17 +68,19 @@ async function setup(browser, { chain = "0x1237", rejectSwitch = false, delay = 
     };
     window.__ls = window.__ls || {}; window.__emit = (ev, arg) => (window.__ls[ev] || []).forEach((cb) => cb(arg));
   }, { ADDR, chain, rejectSwitch, reject });
-  const base = rpcHandler(delay, simMode, badConfig);
+  const base = rpcHandler(delay, simMode, badConfig, gateError);
   const receipt = (status) => ({ status, transactionHash: "0x" + "ab".repeat(32), blockNumber: "0x10", blockHash: "0x" + "1".repeat(64), transactionIndex: "0x0", from: ADDR, to: "0xBeEff033F34C046626B8D0A041844C5d1A5409dd", cumulativeGasUsed: "0x1", gasUsed: "0x1", effectiveGasPrice: "0x1", logs: [], logsBloom: "0x" + "0".repeat(512), type: "0x2", contractAddress: null });
   await page.route("https://rpc.mainnet.chain.robinhood.com/**", async (route) => {
     const body = JSON.parse(route.request().postData());
     const isRcpt = (r) => r.method === "eth_getTransactionReceipt";
-    if (receiptStatus && (Array.isArray(body) ? body.some(isRcpt) : isRcpt(body))) {
-      const one = (r) => ({ jsonrpc: "2.0", id: r.id, result: isRcpt(r) ? receipt(receiptStatus) : null });
+    const rs = typeof receiptStatus === "function" ? receiptStatus() : receiptStatus;
+    if ((rs || receiptError) && (Array.isArray(body) ? body.some(isRcpt) : isRcpt(body))) {
+      const one = (r) => receiptError && isRcpt(r) ? { jsonrpc: "2.0", id: r.id, error: { code: -32000, message: "rpc hiccup" } } : { jsonrpc: "2.0", id: r.id, result: isRcpt(r) && rs ? receipt(rs) : null };
       return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(Array.isArray(body) ? body.map(one) : one(body)) });
     }
     return base(route);
   });
+  if (liquidityUsd !== 36000000) await page.route("**/api/strategy", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ strategy: { address: "0xBeEff033F34C046626B8D0A041844C5d1A5409dd", name: "Steakhouse USDG", totalAssetsUsd: 492000000, liquidityUsd, sharePrice: 1.0078, netApy: 0.0391, avgNetApy: 0.0392, performanceFee: 0, managementFee: 0, listed: true, assetPriceUsd: 1 }, fetchedAt: new Date().toISOString() }) }));
   if (apiDown) await page.route("**/api/strategy", r => r.fulfill({ status: 503, body: '{"error":"x"}', contentType: "application/json" }));
   if (install) await page.clock.install();
   await page.goto(URL.replace(/\/$/, "") + path);
@@ -203,6 +207,44 @@ for (const [mode, expectWord, expectCta] of [[null, "Passed", /Withdraw USDG/], 
   const cta = await btn(page).innerText(); const yc = await page.locator("#earn-module").innerText();
   ok("K1 asset mismatch: CTA reads 'Vault configuration mismatch' and is disabled", /configuration mismatch/i.test(cta) && !(await btn(page).isEnabled()), cta.trim());
   ok("K2 asset mismatch: Yield Check shows Failed for the vault asset", /Vault asset is USDG[\s\S]*Failed/.test(yc));
+  await ctx.close(); }
+
+// L: an RPC error while polling AFTER the tx was sent is "pending", never "failed"
+{ const { ctx, page } = await setup(browser, { receiptError: true }); await page.waitForTimeout(2500);
+  await page.locator("#earn-module").getByRole("button", { name: /^withdraw$/i }).click();
+  await page.locator('input[aria-label="Amount"]').fill("10"); await page.waitForTimeout(1800);
+  await btn(page).click(); await page.waitForTimeout(3500);
+  const d = await page.getByRole("dialog").innerText().catch(() => "");
+  ok("L1 receipt polling error after send: dialog says 'Still pending' (never 'Failed', no resend invitation)", /Still pending/.test(d) && !/Failed/i.test(d.split("\n").slice(0, 3).join(" ")), d.replace(/\n+/g, " | ").slice(0, 90));
+  ok("L2 no 'Transaction not completed' toast in that case", (await page.getByText("Transaction not completed").count()) === 0);
+  await ctx.close(); }
+
+// M: API-reported liquidity never blocks a withdrawal the chain would allow (it only limits what MAX fills in)
+{ const { ctx, page } = await setup(browser, { liquidityUsd: 5 }); await page.waitForTimeout(2500);
+  await page.locator("#earn-module").getByRole("button", { name: /^withdraw$/i }).click();
+  await page.locator('input[aria-label="Amount"]').fill("10"); await page.waitForTimeout(2200);
+  const b = btn(page);
+  ok("M1 API says liquidity is $5, user withdraws 10: button stays enabled (simulation decides)", /Withdraw USDG/.test(await b.innerText()) && (await b.isEnabled()), (await b.innerText()).trim());
+  ok("M2 a plain warning explains the amount is above the reported liquidity", (await page.getByText(/more than the liquidity last reported/).count()) > 0);
+  await page.locator('#earn-module button:has-text("Max")').click();
+  ok("M3 MAX fills in at most the reported liquidity (5)", parseFloat(await page.locator('input[aria-label="Amount"]').inputValue()) <= 5.000001);
+  await ctx.close(); }
+
+// N: an unavailable check is never shown as ready
+{ const { ctx, page } = await setup(browser, { gateError: true }); await page.waitForTimeout(3000);
+  await page.locator('input[aria-label="Amount"]').fill("10"); await page.waitForTimeout(2200);
+  const t = await page.locator("#earn-module").innerText();
+  ok("N1 gate read fails: Yield Check says 'Checks incomplete', not 'Ready to sign'", /CHECKS INCOMPLETE/i.test(t) && !/READY TO SIGN/i.test(t));
+  await ctx.close(); }
+
+// O: account switched while the approval is confirming -> no deposit is ever sent afterwards
+{ let status = null; const { ctx, page } = await setup(browser, { receiptStatus: () => status }); await page.waitForTimeout(2500);
+  await page.locator('input[aria-label="Amount"]').fill("10"); await page.waitForTimeout(2200);
+  await btn(page).click(); await page.waitForTimeout(1500); // approval sent, waiting for its receipt
+  await page.evaluate(() => window.__emit("accountsChanged", ["0x2222222222222222222222222222222222222222"])); await page.waitForTimeout(300);
+  status = "0x1"; await page.waitForTimeout(6000); // the approval now "confirms"
+  const sent = (await page.evaluate(() => window.__calls)).filter((m) => m === "eth_sendTransaction").length;
+  ok("O1 account switched during approval: only the approval was sent, no deposit followed", sent === 1, "eth_sendTransaction x" + sent);
   await ctx.close(); }
 
 await browser.close();
