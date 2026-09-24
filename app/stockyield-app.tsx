@@ -33,7 +33,7 @@ export default function StockYieldApp() {
     onAccountsChanged: (a) => {
       pos.reset();
       setAmount("");
-      tx.setOpen(false);
+      tx.invalidate();
       if (a) void pos.load(a);
     },
     onChainChanged: (a) => {
