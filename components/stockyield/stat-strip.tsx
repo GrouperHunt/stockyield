@@ -1,6 +1,6 @@
 "use client";
 import { RefreshCw } from "lucide-react";
-import { feePct, pct, usdg } from "@/lib/format";
+import { compact, feePct, pct } from "@/lib/format";
 import { useStockYield } from "./provider";
 import { Sk } from "./sk";
 
@@ -24,8 +24,8 @@ export function StatStrip() {
       <div className="mx-auto max-w-[1200px] md:px-8">
         <div className="grid grid-cols-2 divide-x divide-y md:grid-cols-4 md:divide-y-0 md:border-x">
           <Cell i="01" label="Net APY" note="Variable · after vault fees">{V(x ? pct(x.netApy) : "")}</Cell>
-          <Cell i="02" label="Vault TVL" note="Total assets in this vault, in USDG">{V(x ? usdg(x.totalAssets) : "")}</Cell>
-          <Cell i="03" label="Liquidity" note="Reported by API, in USDG">{V(x ? usdg(x.liquidity) : "")}</Cell>
+          <Cell i="02" label="Vault TVL" note="Total assets in this vault, in USDG">{x ? <>{compact(x.totalAssets)}<span className="ml-1.5 text-base text-ink-2">USDG</span></> : V("")}</Cell>
+          <Cell i="03" label="Liquidity" note="Reported by API, in USDG">{x ? <>{compact(x.liquidity)}<span className="ml-1.5 text-base text-ink-2">USDG</span></> : V("")}</Cell>
           <Cell i="04" label="Vault fees" note="Management · performance">{V(x ? `${feePct(x.managementFee)} · ${feePct(x.performanceFee)}` : "")}</Cell>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5 text-xs text-ink-2 md:border-x md:px-6">

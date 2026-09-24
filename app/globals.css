@@ -135,6 +135,15 @@
 .nudge { animation: nudge 0.24s ease-in-out 1; }
 .live-dot { animation: live 2s ease-in-out infinite; }
 
+/* Hero ribbon: light travelling over the logo (masked by the logo's own alpha) + mouse parallax */
+.ribbon-layer { transform: translate3d(calc(var(--mx, 0) * -12px), calc(var(--my, 0) * -9px), 0) rotate(calc(var(--mx, 0) * 1.5deg)); transition: transform 0.35s var(--ease); will-change: transform; }
+.ribbon-shine { position: absolute; inset: 0; pointer-events: none; -webkit-mask: url(/brand/logo-transparent.png) center / contain no-repeat; mask: url(/brand/logo-transparent.png) center / contain no-repeat; background: linear-gradient(105deg, transparent 36%, rgba(255, 255, 255, 0.95) 50%, transparent 64%); background-size: 260% 100%; background-position: 130% 0; mix-blend-mode: soft-light; animation: shine 6.5s cubic-bezier(0.45, 0, 0.2, 1) infinite; }
+@keyframes shine { 0% { background-position: 130% 0; } 55%, 100% { background-position: -70% 0; } }
+/* Flow path nodes */
+.flow-dot { fill: var(--surface); stroke: var(--ink); transition: fill 0.4s var(--ease), transform 0.4s var(--ease); }
+.flow-dot[data-lit="true"] { fill: var(--signal); }
+.flow-card[data-lit="true"] { border-color: var(--ink); box-shadow: -3px 0 0 0 var(--signal); }
+
 /* Funds path: --p (0..1) is written by JS from scroll position; each element maps it to its own window. */
 .fp { --p: 0; }
 .fp .draw { stroke-dasharray: 1; stroke-dashoffset: calc(1 - clamp(0, (var(--p) - var(--a)) * var(--k), 1)); }
@@ -147,4 +156,6 @@ noscript .fp { --p: 1; }
   .js .reveal { opacity: 1; transform: none; }
   .fp { --p: 1 !important; }
   .fp .dot { display: none; }
+  .ribbon-shine { animation: none; opacity: 0; }
+  .ribbon-layer { transform: none; }
 }
