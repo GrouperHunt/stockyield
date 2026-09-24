@@ -1,75 +1,76 @@
-# Procedura guidata per il primo test reale (fondi minimi, firmati da te)
+# Test del ciclo completo sulla preview — 1 USDG
 
-Questa procedura presuppone che l'app sia già pubblicata su un **deployment Vercel ad accesso limitato** (vedi sezione "Deployment pilota" più sotto) con `NEXT_PUBLIC_ENABLE_TRANSACTIONS=true` **solo lì**, mentre Production resta `false`. Non procedere se questa separazione non è confermata.
+Sito da provare (solo tu, dietro il tuo login Vercel):
+https://stockyield-vercel-git-redesign-mauripalm24-4207s-projects.vercel.app
 
-Usa un importo minimo (es. 1–5 USDG): l'obiettivo è verificare il ciclo, non il rendimento.
-
-## Passo 0 — Prerequisiti sul tuo wallet
-- Un wallet browser (MetaMask, Rabby, ecc.) con una piccola quantità di **ETH nativo** per il gas su Robinhood Chain (chain ID 4663) e almeno l'importo minimo di **USDG** che vuoi depositare.
-- **Cosa devi vedere**: il tuo wallet ha un saldo ETH > 0 su Robinhood Chain. Se non hai ETH lì, questa procedura si ferma qui: serve prima un modo per farlo arrivare (bridge/exchange — fuori dallo scope di questo codice).
-
-## Passo 1 — Connessione
-1. Apri l'URL del deployment pilota.
-2. Clicca "Connect wallet".
-3. Approva la connessione nel wallet.
-
-**Cosa devi vedere**: l'header mostra il tuo indirizzo abbreviato al posto di "Connect wallet". Se hai più wallet installati, l'app ti chiede quale usare prima di procedere.
-**Come confermare**: nessuna transazione ancora — è solo una connessione, non firma nulla che muova fondi.
-
-## Passo 2 — Controllo rete e asset
-**Cosa devi vedere**: 
-- Nessun banner giallo "Your wallet is on the wrong network". Se compare, clicca il pulsante e conferma il cambio rete nel wallet (l'app non aggiunge la rete automaticamente se il wallet la rifiuta — solo se non la conosce).
-- Il riquadro "Yield Check" mostra tutte le spunte verdi tranne eventualmente l'importo (non hai ancora digitato nulla): "No allowlist gate active" deve avere la spunta verde (verificato live contro il contratto, non un valore fisso).
-- Il saldo USDG del wallet visualizzato in "Wallet balance" corrisponde a quello che vedi nel tuo wallet.
-
-**Come confermare on-chain**: apri l'indirizzo del tuo wallet su [Blockscout](https://robinhoodchain.blockscout.com) e confronta il saldo USDG.
-
-## Passo 3 — Importo minimo
-1. Digita l'importo minimo scelto (es. "1").
-2. **Cosa devi vedere**: il controvalore in dollari sotto il campo si aggiorna; "Estimated annual yield" mostra una cifra coerente con l'APY corrente; il pulsante diventa "Earn with USDG" (non più grigio), a meno che manchi qualcosa (gas, saldo).
-
-## Passo 4 — Approvazione (limitata all'importo)
-1. Clicca "Earn with USDG".
-2. Se è la prima volta che usi questo wallet con il vault, il tuo wallet ti chiederà di firmare un'**approvazione** — controlla che l'importo mostrato nel wallet corrisponda esattamente a quello digitato (l'app richiede sempre un'allowance pari all'importo, mai illimitata).
-3. Firma.
-
-**Cosa devi vedere**: il dialog "Confirm in your wallet" mostra "Allow the vault to use the selected USDG", con uno spinner, poi passa da solo al passo successivo.
-**Come confermare on-chain**: il link "View transaction" nel dialog porta a Blockscout; lo stato della transazione deve essere "Success".
-
-## Passo 5 — Deposito
-Dopo l'approvazione, l'app chiede automaticamente la firma del deposito vero e proprio.
-
-**Cosa devi vedere**: il dialog passa a "Deposit USDG directly into Morpho", poi a "Transaction confirmed" con un segno di spunta.
-**Come confermare on-chain**: la seconda transazione su Blockscout deve avere status "Success" e un evento `Transfer` di USDG dal tuo indirizzo verso il vault, oltre a un evento `Transfer` di shares (token del vault) dall'indirizzo zero verso il tuo indirizzo (il "mint" delle shares).
-**Se qualcosa va storto**: l'app non mostra mai "successo" se `receipt.status` non è `success` — un revert produce un messaggio d'errore esplicito, mai un falso positivo.
-
-## Passo 6 — Posizione
-**Cosa devi vedere**: nella sezione "My position", "Current value" mostra circa l'importo depositato (può differire di pochi decimali per via dello share price), "Vault shares" mostra un numero di shares coerente.
-**Come confermare on-chain**: `balanceOf(tuo indirizzo)` sul contratto vault (via Blockscout, tab "Read Contract") deve corrispondere alle shares mostrate; `convertToAssets(quelle shares)` deve corrispondere al valore mostrato.
-
-## Passo 7 — Prelievo
-1. Passa al tab "Withdraw".
-2. Digita lo stesso importo minimo (o clicca "MAX" per prelevare tutto).
-3. Firma quando richiesto.
-
-**Cosa devi vedere**: se l'importo supera l'ultima liquidità disponibile riportata (poco probabile con un importo minimo), un avviso giallo non bloccante te lo segnala prima di firmare. Il dialog passa a "Return USDG to your wallet" poi a "Transaction confirmed".
-**Come confermare on-chain**: la transazione `withdraw` su Blockscout con status "Success"; il tuo saldo USDG nel wallet (e su Blockscout) aumenta dell'importo prelevato; le shares nella sezione posizione diminuiscono o arrivano a zero.
-
-## Se qualcosa non torna
-- **Il wallet mostra un importo di approvazione diverso da quello digitato**: non firmare, chiudi la finestra e segnalamelo — non dovrebbe mai succedere con questa versione del codice.
-- **La transazione fallisce con un messaggio leggibile** (non un errore grezzo): è il comportamento atteso quando qualcosa blocca l'operazione (saldo, allowance, liquidità) — segnalamelo comunque per verificare che il messaggio sia corretto.
-- **Il sito mostra "successo" ma su Blockscout la transazione è "Failed"**: questo non dovrebbe poter succedere (controlliamo sempre `receipt.status`) — se accade, è un bug critico da fermare subito.
+Firmi solo tu, dal tuo wallet. Non condividere mai seed phrase, chiavi private o password: il sito non le chiede e io nemmeno.
+Importo di prova: **1 USDG**. Ti serve anche un po' di ETH su Robinhood Chain per le commissioni di rete.
 
 ---
 
-# Deployment pilota — come separare Preview (transazioni attive) da Production (transazioni bloccate)
+## Passo 0 — Il pulsante è attivo?
+Apri il sito e guarda il pulsante grande nel riquadro "Earn with USDG".
+- **Devi vedere:** "Connect Wallet" (verde).
+- **Se vedi "Transactions pending validation":** fermati. Questo sito non ha le transazioni accese. Dimmelo.
 
-Questo usa solo funzionalità Vercel già esistenti, nessun codice aggiuntivo.
+## Passo 1 — Collega il wallet
+Clicca **Connect Wallet** in alto a destra e conferma nel wallet.
+- **Devi vedere:** al posto del pulsante il tuo indirizzo abbreviato (0x…).
+- **Se il wallet non si apre:** ricarica la pagina; se hai più wallet installati scegli quello che vuoi dalla finestra che compare.
 
-1. Su Vercel, nel progetto StockYield: **Settings → Environment Variables**.
-2. Variabile `NEXT_PUBLIC_ENABLE_TRANSACTIONS`:
-   - Per l'ambiente **Production**: valore `false`.
-   - Per l'ambiente **Preview**: valore `true`.
-3. Crea un branch dedicato (es. `pilot-test`) e fai push: Vercel genera automaticamente un deployment Preview con URL dedicato, che builda con `true`.
-4. **Restringi l'accesso a quell'URL** prima di condividerlo con te stesso: Settings → Deployment Protection → attiva "Vercel Authentication" (richiede login Vercel) o "Password Protection" per i deployment Preview. Senza questo, l'URL Preview è comunque pubblico se qualcuno lo indovina.
-5. Verifica prima di firmare: apri l'URL Preview, controlla che il pulsante NON mostri "Transactions pending validation" — se lo mostra ancora, la variabile non è stata applicata a quel deployment (serve un nuovo deploy dopo aver impostato la variabile).
+## Passo 2 — Rete giusta
+- **Devi vedere:** nel riquadro, sotto "Where do the funds go?", la riga "Wallet is on Robinhood Chain" con **Passed**.
+- **Se vedi una striscia gialla "wrong network":** clicca il pulsante verde "Switch to Robinhood Chain" e conferma nel wallet. Se rifiuti, non succede nulla di grave: riprova.
+
+## Passo 3 — Saldo e posizione di partenza
+- **Devi vedere:** "Balance … USDG" nel riquadro, uguale al saldo USDG nel tuo wallet.
+- Vai alla pagina **Position** (menu in alto): deve dire **"No position yet. Deposit USDG to get started."**
+- **Se vedi "Loading…" a lungo o "Unable to load your position.":** premi **Retry**. Se resta così, dimmelo (non deve mai mostrarti "0" al posto di un errore).
+
+## Passo 4 — Inserisci 1 USDG
+Torna a **Earn**, scheda **Deposit**, scrivi `1`.
+- **Devi vedere:**
+  - "Estimated annual yield" con sotto la scritta *Estimate at current variable APY. Not guaranteed.*
+  - Nel **Yield Check**: "Transaction simulation" con **Passed**, "Network fee (estimate)" con un valore in ETH, "ETH for gas in your wallet" **Passed**, e in alto **READY TO SIGN**.
+  - Sotto: "2 signatures: Step 1 Approve USDG (limited to this amount) → Step 2 Deposit USDG".
+  - Il pulsante verde dice **Earn with USDG**.
+- **Se il pulsante è grigio:** leggi cosa dice, ti spiega il motivo (es. "Enter an amount", "ETH needed for gas", "Simulation failed"). Fai uno screenshot e dimmelo.
+
+## Passo 5 — Approve (prima firma)
+Clicca **Earn with USDG**.
+- **Devi vedere nel wallet:** una richiesta di approvazione. **Controlla che l'importo sia 1 USDG, non "illimitato".** Se è illimitato, **non firmare** e dimmelo.
+- **Sul sito:** finestra "Waiting for wallet" → dopo la firma "Submitted" → "Step 1 of 2 · Approve USDG" diventa Confirmed.
+
+## Passo 6 — Deposit (seconda firma)
+- **Devi vedere:** nella finestra "Deposit simulation (after approval)" con **Passed**, poi il wallet ti chiede la seconda firma. Firma.
+- **Alla fine:** titolo **Confirmed** e "Your transaction succeeded on-chain".
+- **Controllo sulla chain:** clicca "View transaction on the explorer". Deve dire **Success**. Fai lo stesso con la transazione di approvazione se vuoi.
+
+## Passo 7 — La posizione
+Chiudi la finestra (**Done**) e vai su **Position**.
+- **Devi vedere:** "Position value" circa **1 USDG** (può essere 0,99999… : è normale), shares maggiori di zero, "Last read" con l'orario di adesso.
+- **Se vedi ancora "No position yet":** premi il pulsante di refresh (frecce) accanto al valore. Se dopo 1 minuto è ancora vuoto, dimmelo con il link della transazione.
+
+## Passo 8 — Prelievo
+Nella pagina Position clicca **Withdraw**, nel riquadro a destra premi **MAX** (non scrivere 1: il valore può essere 0,999999 e MAX evita l'errore per un soffio).
+- **Devi vedere:** "You receive (estimate) ≈ … USDG", "Recipient" con il tuo indirizzo, Yield Check con **Passed**, pulsante **Withdraw USDG**.
+- Clicca, firma nel wallet.
+- **Alla fine:** **Confirmed**, il saldo USDG nel wallet torna a circa quello di partenza (meno nulla: le commissioni sono in ETH), la posizione scende a ~0.
+- **Se vedi "Amount exceeds withdrawable":** la liquidità del vault in quel momento è bassa. Non è un errore del sito: riprova più tardi o con un importo minore, e dimmelo.
+
+## Cosa significano i messaggi della finestra
+| Titolo | Significa | Cosa fare |
+|---|---|---|
+| Waiting for wallet | Aspetta la tua firma | Conferma nel wallet |
+| Submitted | Inviata, in attesa | Aspetta |
+| Confirmed | Riuscita sulla chain | Niente |
+| Failed | Non è andata a buon fine (motivo scritto) | Non è stato speso nulla di importante oltre al gas; dimmi il motivo |
+| Rejected by user | Hai rifiutato nel wallet | Nulla è stato inviato per quel passo; puoi riprovare |
+| Still pending | Inviata ma non ancora confermata | **Non reinviare.** Apri il link dell'explorer e aspetta; poi "Close and refresh position" |
+
+## Alla fine dimmi
+1. Cosa diceva il pulsante al passo 0.
+2. Ogni passo: ok / problema (con screenshot se c'è un problema).
+3. I link Blockscout dell'approvazione, del deposito e del prelievo.
+
+Quando mi confermi che tutto il ciclo funziona, preparo il passaggio in production.
