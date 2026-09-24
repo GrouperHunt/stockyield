@@ -22,11 +22,12 @@ const fmt = (v: bigint, decimals: number) => Number(formatUnits(v, decimals)).to
 
 export function EarnModule() {
   const s = useStockYield();
-  const { info, m, pos, wallet, tx, sim, mode, amount, decimals, parsed, balance, enough, hasShares, hasGas, limitedByLiquidity } = s;
+  const { info, m, pos, wallet, tx, sim, mode, amount, decimals, parsed, balance, maxAmount, enough, hasShares, hasGas, limitedByLiquidity } = s;
   const { address, wrongNetwork } = wallet;
   const metrics = m.metrics;
   const position = pos.position;
   const price = metrics?.assetPriceUsd ?? null;
+  const aboveReportedLiquidity = mode === "withdraw" && limitedByLiquidity && parsed > maxAmount;
   const busy = tx.busy || wallet.switching;
   const switchable = !!address && !!wallet.provider && wrongNetwork;
   const overBalance = parsed > 0n && parsed > balance;
@@ -41,7 +42,7 @@ export function EarnModule() {
       await wallet.connect();
       return;
     }
-    if (!enough || (mode === "deposit" && (!metrics || m.stale))) return;
+    if (!enough || (mode === "deposit" && (!metrics || m.error || m.stale))) return;
     if (m.configOk === false) return;
     if (m.gatesOpen === false) {
       toast.error("A gate is currently active on this vault", { description: "Deposits or withdrawals may require allowlisting. Do not proceed until this is confirmed with Steakhouse/Morpho." });
@@ -60,9 +61,9 @@ export function EarnModule() {
     if (!address) return { ...base, label: "Connect Wallet", disabled: busy };
     if (!position) return { ...base, label: pos.error ? "Position unavailable — retry" : "Loading your balance…", disabled: true };
     if (parsed === 0n) return { ...base, label: "Enter an amount", disabled: true };
-    if (!enough) return { ...base, label: mode === "deposit" ? "Amount exceeds your balance" : "Amount exceeds withdrawable", disabled: true };
+    if (!enough) return { ...base, label: mode === "deposit" ? "Amount exceeds your balance" : "Amount exceeds your position", disabled: true };
     if (!hasGas) return { ...base, label: "ETH needed for gas", disabled: true };
-    if (mode === "deposit" && !metrics) return { ...base, label: m.error ? "Vault data unavailable" : "Loading vault data…", disabled: true };
+    if (mode === "deposit" && (!metrics || m.error)) return { ...base, label: m.error ? "Vault data unavailable" : "Loading vault data…", disabled: true };
     if (mode === "deposit" && m.stale) return { ...base, label: "Data outdated — refresh", disabled: true };
     if (sim.status === "failed") return { ...base, label: "Simulation failed", disabled: true };
     return { ...base, label: mode === "deposit" ? "Earn with USDG" : "Withdraw USDG", disabled: busy || sim.status === "checking" };
@@ -100,7 +101,7 @@ export function EarnModule() {
           <div className="flex items-baseline justify-between text-sm">
             <label htmlFor="amount" className="eyebrow">{mode === "deposit" ? "Amount to deposit" : "Amount to withdraw"}</label>
             <span className="num text-ink-2">
-              {mode === "deposit" ? "Balance " : limitedByLiquidity ? "Withdrawable (liquidity-limited) " : "Position value "}
+              {mode === "deposit" ? "Balance " : "Position value "}
               {position ? <>{fmt(balance, decimals)} USDG</> : pos.error ? "Unavailable" : address ? <span className="skeleton">0.00 USDG</span> : "—"}
             </span>
           </div>
@@ -118,15 +119,18 @@ export function EarnModule() {
               className="num min-w-0 flex-1 bg-transparent text-3xl font-medium tracking-tight outline-none placeholder:text-ink-2/40"
             />
             <span className="font-mono text-sm">USDG</span>
-            <button type="button" disabled={!position} onClick={() => s.setAmount(formatUnits(balance, decimals))} className="border px-2 py-1 font-mono text-xs uppercase transition-colors hover:bg-surface-2 active:translate-y-px disabled:opacity-40">Max</button>
+            <button type="button" disabled={!position} onClick={() => s.setAmount(formatUnits(maxAmount, decimals))} className="border px-2 py-1 font-mono text-xs uppercase transition-colors hover:bg-surface-2 active:translate-y-px disabled:opacity-40">Max</button>
           </div>
           <div className="mt-2 flex justify-between text-xs text-ink-2">
             <span className="num">{price !== null ? <>≈ {cash(Number(amount || 0) * price)}</> : "USD value unavailable"}</span>
-            {mode === "withdraw" && limitedByLiquidity && <span>Limited by last reported liquidity</span>}
+            {mode === "withdraw" && limitedByLiquidity && <span>MAX is limited to the last reported liquidity</span>}
           </div>
+          {aboveReportedLiquidity && !overBalance && (
+            <p className="mt-2 text-sm text-warn">This is more than the liquidity last reported by the API. The simulation below decides whether it can be withdrawn now; if not, try a smaller amount.</p>
+          )}
           {overBalance && (
             <p id={errId} role="alert" className="mt-2 text-sm text-danger">
-              {mode === "deposit" ? "Amount exceeds your USDG balance." : limitedByLiquidity ? "Amount exceeds what the last reported liquidity allows." : "Amount exceeds your position value."}
+              {mode === "deposit" ? "Amount exceeds your USDG balance." : "Amount exceeds your position value."}
             </p>
           )}
         </div>

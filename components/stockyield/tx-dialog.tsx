@@ -19,8 +19,8 @@ function Icon({ s }: { s: RowStatus }) {
   return <span className={`${base} border-dashed border-ink-2`} />;
 }
 
-export function TxDialog({ open, busy, step, action, approvalNeeded, failedAt, hash, error, sim, explorer, onOpenChange, onClose }: {
-  open: boolean; busy: boolean; step: TxStep; action: TxAction; approvalNeeded: boolean; failedAt: TxStep | null; hash: string | null; error: string | null; sim: SimState; explorer: string;
+export function TxDialog({ open, step, action, approvalNeeded, failedAt, hash, error, sim, explorer, onOpenChange, onClose }: {
+  open: boolean; step: TxStep; action: TxAction; approvalNeeded: boolean; failedAt: TxStep | null; hash: string | null; error: string | null; sim: SimState; explorer: string;
   onOpenChange: (o: boolean) => void; onClose: () => void;
 }) {
   const terminal = step === "done" || step === "failed" || step === "rejected" || step === "pending";
@@ -50,7 +50,7 @@ export function TxDialog({ open, busy, step, action, approvalNeeded, failedAt, h
   const showSim = action === "deposit" && approvalNeeded && sim.status !== "idle";
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!busy) onOpenChange(o); }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-md bg-surface sm:max-w-md">
         <DialogHeader>
           <p className="eyebrow">{action === "deposit" ? "Deposit" : "Withdraw"}</p>

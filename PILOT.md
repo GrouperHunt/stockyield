@@ -56,7 +56,7 @@ Nella pagina Position clicca **Withdraw**, nel riquadro a destra premi **MAX** (
 - **Devi vedere:** "You receive (estimate) ≈ … USDG", "Recipient" con il tuo indirizzo, Yield Check con **Passed**, pulsante **Withdraw USDG**.
 - Clicca, firma nel wallet.
 - **Alla fine:** **Confirmed**, il saldo USDG nel wallet torna a circa quello di partenza (meno nulla: le commissioni sono in ETH), la posizione scende a ~0.
-- **Se vedi "Amount exceeds withdrawable":** la liquidità del vault in quel momento è bassa. Non è un errore del sito: riprova più tardi o con un importo minore, e dimmelo.
+- **Se il Yield Check dice "Simulation … Failed" o il pulsante "Simulation failed":** in quel momento il vault non riesce a restituire tutto (liquidità bassa). Non è un errore del sito: riprova più tardi o con un importo minore, e dimmelo.
 
 ## Cosa significano i messaggi della finestra
 | Titolo | Significa | Cosa fare |

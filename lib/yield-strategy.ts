@@ -58,6 +58,8 @@ export type ExecuteParams = {
   onStep: (step: TxStep) => void;
   onHash: (hash: string | null) => void;
   onSim?: (sim: SimState) => void;
+  // False once the run was invalidated (account/network changed): stop before signing anything else.
+  isLive?: () => boolean;
 };
 
 export interface YieldStrategy {

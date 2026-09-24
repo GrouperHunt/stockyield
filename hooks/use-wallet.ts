@@ -32,6 +32,7 @@ export function useWallet(chain: ChainParams, handlers: WalletHandlers) {
 
   const handlersRef = useRef(handlers);
   const addressRef = useRef(address);
+  const announcedRef = useRef(0);
   useEffect(() => {
     handlersRef.current = handlers;
     addressRef.current = address;
@@ -53,6 +54,7 @@ export function useWallet(chain: ChainParams, handlers: WalletHandlers) {
   // itself instead of assuming window.ethereum is the only (or right) wallet.
   useEffect(() => {
     const onAnnounce = (event: WindowEventMap["eip6963:announceProvider"]) => {
+      announcedRef.current += 1;
       setWallets((prev) => (prev.some((w) => w.info.uuid === event.detail.info.uuid) ? prev : [...prev, event.detail]));
     };
     window.addEventListener("eip6963:announceProvider", onAnnounce);
@@ -64,14 +66,25 @@ export function useWallet(chain: ChainParams, handlers: WalletHandlers) {
   // prompting a fresh connection popup.
   useEffect(() => {
     if (!window.ethereum) return;
-    void window.ethereum.request({ method: "eth_accounts" }).then((x) => {
-      const a = (x as string[])[0] as Address | undefined;
-      if (!a || !window.ethereum) return;
-      setProvider(window.ethereum);
-      setAddress(a);
-      handlersRef.current.onConnected(a);
-      void checkNetwork(window.ethereum);
-    });
+    let cancelled = false;
+    // Wait for EIP-6963 announcements first: with several wallets installed, window.ethereum
+    // may not be the one the user picked, so only reconnect silently when there is no ambiguity.
+    const t = setTimeout(() => {
+      if (cancelled || announcedRef.current > 1 || !window.ethereum) return;
+      const p = window.ethereum;
+      void p.request({ method: "eth_accounts" }).then((x) => {
+        const a = (x as string[])[0] as Address | undefined;
+        if (cancelled || !a) return;
+        setProvider(p);
+        setAddress(a);
+        handlersRef.current.onConnected(a);
+        void checkNetwork(p);
+      });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [checkNetwork]);
 
   // Keeps the UI honest about the live wallet/network instead of trusting

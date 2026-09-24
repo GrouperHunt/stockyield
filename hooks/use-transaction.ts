@@ -24,6 +24,7 @@ export function useTransaction(strategy: YieldStrategy, { provider, address, ens
   const [failedAt, setFailedAt] = useState<TxStep | null>(null);
   const runRef = useRef(0);
   const stepRef = useRef<TxStep>("approval");
+  const hashRef = useRef<string | null>(null);
   const put = (s: TxStep) => {
     stepRef.current = s;
     setStep(s);
@@ -43,6 +44,7 @@ export function useTransaction(strategy: YieldStrategy, { provider, address, ens
     const live = () => runRef.current === id;
     setBusy(true);
     setOpen(true);
+    hashRef.current = null;
     setHash(null);
     setError(null);
     setSim({ status: "idle" });
@@ -68,7 +70,11 @@ export function useTransaction(strategy: YieldStrategy, { provider, address, ens
           if (s === "approval") setApprovalNeeded(true);
           put(s);
         },
-        onHash: (h) => live() && setHash(h),
+        onHash: (h) => {
+          hashRef.current = h;
+          if (live()) setHash(h);
+        },
+        isLive: live,
         onSim: (s) => live() && setSim(s),
       });
       if (!live()) return;
@@ -77,8 +83,13 @@ export function useTransaction(strategy: YieldStrategy, { provider, address, ens
     } catch (e) {
       if (!live()) return;
       setFailedAt(stepRef.current);
-      if (isReceiptTimeout(e)) {
+      // Once a hash exists the transaction was sent. Any error that is not an explicit
+      // on-chain revert (RPC hiccup while polling, timeout) means "unknown", never "failed":
+      // it may still confirm, so the user must not be invited to resend.
+      const message = e instanceof Error ? e.message : "";
+      if (isReceiptTimeout(e) || (hashRef.current && !isUserRejection(e) && !/reverted on-chain/i.test(message))) {
         put("pending");
+        toast.info("Sent, but not confirmed yet", { description: "Check the transaction on the explorer before trying again. Do not resend." });
         return;
       }
       setError(describeTxError(e));

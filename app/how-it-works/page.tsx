@@ -94,7 +94,7 @@ export default function HowItWorksPage() {
 
       <section className="mx-auto max-w-[1200px] px-4 pt-24 md:px-8">
         <SectionHead eyebrow="03 · Strategy details" title="Every address, fee and source.">
-          <p>Contracts come from StockYield&apos;s verified configuration. Metrics come from the Morpho API; balances are read on-chain.</p>
+          <p>Contract addresses come from StockYield&apos;s configuration and the asset and decimals are checked on-chain each time the page loads. Metrics come from the Morpho API; balances are read on-chain.</p>
         </SectionHead>
         <div className="mt-10 max-w-3xl"><StrategyDetailsContent /></div>
       </section>

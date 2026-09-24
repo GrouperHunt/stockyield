@@ -44,13 +44,14 @@ export function YieldCheck() {
       ? `${eth(sim.feeWei)} for ${sim.step === "approval" ? "step 1 (approve); the deposit is estimated after approval" : sim.step === "deposit" ? "the deposit" : "the withdrawal"}`
       : sim.status === "idle" ? "Shown once your wallet is connected and an amount is entered" : undefined;
   const dataRequired = mode === "deposit";
-  const ready = network === "passed" && gas === "passed" && gates !== "failed" && config !== "failed" && simState === "passed" && (!dataRequired || data === "passed");
-
+  const required = [network, gas, gates, config, simState, ...(dataRequired ? [data] : [])];
+  // Ready only when every required check really passed; unknown is "incomplete", never a pass.
+  const overall = required.includes("failed") ? "Not ready" : required.every((c) => c === "passed") ? "Ready to sign" : "Checks incomplete";
   return (
     <section aria-labelledby="yc-title" className="border bg-surface">
       <div className="flex items-center justify-between gap-3 border-b bg-mint-soft px-4 py-3">
         <h3 id="yc-title" className="text-sm font-semibold">Yield Check</h3>
-        <span key={String(ready)} className="sweep border px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider">{ready ? "Ready to sign" : "Not ready"}</span>
+        <span key={overall} className="sweep border px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider">{overall}</span>
       </div>
       <ul className="px-4">
         <Q q="Where do the funds go?">

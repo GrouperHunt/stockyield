@@ -10,20 +10,20 @@ const QUERY = `query($address:String!,$chainId:Int!){ vaultV2ByAddress(address:$
 export async function GET() {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    let response: Response;
+    const timeout = setTimeout(() => controller.abort(), 8000); // covers headers AND body
+    let json: { data?: { vaultV2ByAddress?: unknown }; errors?: unknown[] };
     try {
-      response = await fetch("https://api.morpho.org/graphql", {
+      const response = await fetch("https://api.morpho.org/graphql", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ query: QUERY, variables: { address: VAULT, chainId: CHAIN_ID } }),
         signal: controller.signal,
       });
+      if (!response.ok) throw new Error(`Morpho API responded with status ${response.status}`);
+      json = (await response.json()) as typeof json;
     } finally {
       clearTimeout(timeout);
     }
-    if (!response.ok) throw new Error(`Morpho API responded with status ${response.status}`);
-    const json = (await response.json()) as { data?: { vaultV2ByAddress?: unknown }; errors?: unknown[] };
     if (json.errors?.length) throw new Error("Morpho API returned an error");
     const strategy = parseMetrics(json.data?.vaultV2ByAddress);
     if (!strategy) throw new Error("Unexpected vault data shape");

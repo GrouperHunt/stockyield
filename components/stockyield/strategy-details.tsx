@@ -39,7 +39,7 @@ export function StrategyDetailsContent() {
           <Row k="Documentation"><a className={ext} href={info.docsUrl} target="_blank" rel="noreferrer">{info.vaultDocsNote}<ExternalLink size={13} /></a></Row>
           <Row k="Strategy page"><a className={ext} href={info.strategyUrl} target="_blank" rel="noreferrer">Vault on Morpho<ExternalLink size={13} /></a></Row>
         </dl>
-        <p className="mt-2 text-xs text-ink-2">Addresses come from StockYield&apos;s verified configuration and were checked on-chain (vault asset, decimals).</p>
+        <p className="mt-2 text-xs text-ink-2">Addresses come from StockYield&apos;s configuration; the vault asset and its decimals are checked on-chain each time the page loads.</p>
       </section>
       <section>
         <h3 className="mb-2 text-base font-semibold">Live metrics</h3>

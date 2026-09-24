@@ -39,7 +39,7 @@ export async function simulate(action: TxAction, { owner, amount }: { owner: Add
 
 // Every step is simulated before the wallet is asked to sign, and success is
 // only reported when the receipt status is "success" (a hash is not a deposit).
-export async function execute(action: TxAction, { owner, amount, wallet, hasShares, onStep, onHash, onSim }: ExecuteParams): Promise<void> {
+export async function execute(action: TxAction, { owner, amount, wallet, hasShares, onStep, onHash, onSim, isLive = () => true }: ExecuteParams): Promise<void> {
   if (action === "deposit") {
     const allowance = await client.readContract({ address: USDG, abi: erc20Abi, functionName: "allowance", args: [owner, VAULT] });
     if (allowance < amount) {
@@ -50,18 +50,29 @@ export async function execute(action: TxAction, { owner, amount, wallet, hasShar
       const approveReceipt = await client.waitForTransactionReceipt({ hash: approveHash });
       if (approveReceipt.status !== "success") throw new Error("The approval transaction reverted on-chain.");
     }
+    if (!isLive()) return;
 
     onStep("deposit");
     onHash(null);
-    // Re-simulate the deposit now that the allowance is in place, and show it.
+    // Re-simulate the deposit now that the allowance is in place, and show it. A node that
+    // is a block behind can still report the old allowance, so a revert is retried briefly.
     onSim?.({ status: "checking" });
-    try {
-      await client.simulateContract({ account: owner, address: VAULT, abi: vaultAbi, functionName: "deposit", args: [amount, owner] });
-    } catch (e) {
-      onSim?.({ status: "failed", reason: describeTxError(e) });
-      throw e;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await client.simulateContract({ account: owner, address: VAULT, abi: vaultAbi, functionName: "deposit", args: [amount, owner] });
+        break;
+      } catch (e) {
+        if (attempt < 3 && isLive()) {
+          await new Promise((r) => setTimeout(r, 1500));
+          continue;
+        }
+        onSim?.({ status: "failed", reason: describeTxError(e) });
+        throw e;
+      }
     }
+    if (!isLive()) return;
     onSim?.({ status: "passed", step: "deposit", feeWei: null });
+    if (!isLive()) return;
     const depositHash = await wallet.writeContract({ account: owner, chain: wallet.chain, address: VAULT, abi: vaultAbi, functionName: "deposit", args: [amount, owner] });
     onHash(depositHash);
     const depositReceipt = await client.waitForTransactionReceipt({ hash: depositHash });

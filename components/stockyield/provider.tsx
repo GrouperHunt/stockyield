@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { parseUnits, type Address } from "viem";
+import type { Address } from "viem";
 import { useMetrics } from "@/hooks/use-metrics";
 import { usePosition } from "@/hooks/use-position";
 import { useSimulation } from "@/hooks/use-simulation";
@@ -42,13 +42,18 @@ function useStockYieldState() {
   const position = pos.position;
   const parsed = parseAmount(amount, decimals);
 
-  // Withdraw ceiling: the position's value (shares converted to assets), further
-  // capped by the last reported liquidity when known. maxWithdraw is not used:
-  // it is a hardcoded 0 in this Vault V2 (see lib/strategies/steakhouse-usdg/config.ts).
-  const liquidityAssets = m.metrics ? parseUnits(String(Math.max(0, m.metrics.liquidityUsd / (m.metrics.assetPriceUsd ?? 1)).toFixed(decimals)), decimals) : null;
+  // Withdraw: the position's value (shares converted to assets) is the ceiling that is
+  // enforced; the on-chain simulation decides whether it can actually be withdrawn now.
+  // The API-reported liquidity only lowers what MAX fills in (a hint, never a block),
+  // so a lagging third-party number can't stop a withdrawal the chain would allow.
+  // maxWithdraw is not used: it is a hardcoded 0 in this Vault V2 (see config.ts).
   const positionValue = position?.assets ?? 0n;
+  const price = m.metrics?.assetPriceUsd ?? null;
+  const liquidityUnits = m.metrics && price !== null && price > 0 ? (m.metrics.liquidityUsd / price) * 10 ** decimals : null;
+  const liquidityAssets = liquidityUnits !== null && Number.isFinite(liquidityUnits) && liquidityUnits >= 0 && liquidityUnits < Number.MAX_SAFE_INTEGER ? BigInt(Math.floor(liquidityUnits)) : null;
   const limitedByLiquidity = mode === "withdraw" && liquidityAssets !== null && liquidityAssets < positionValue;
-  const balance = mode === "deposit" ? position?.walletBalance ?? 0n : limitedByLiquidity ? liquidityAssets! : positionValue;
+  const balance = mode === "deposit" ? position?.walletBalance ?? 0n : positionValue;
+  const maxAmount = limitedByLiquidity ? liquidityAssets! : balance;
   const enough = parsed > 0n && parsed <= balance;
   const hasShares = (position?.shares ?? 0n) > 0n;
   const hasGas = (position?.ethBalance ?? 0n) > 0n;
@@ -67,7 +72,7 @@ function useStockYieldState() {
       if (wallet.address) await pos.load(wallet.address);
     });
 
-  return { strategy, info, m, pos, wallet, tx, sim, amount, setAmount, mode, setMode, detailsOpen, setDetailsOpen, parsed, balance, enough, hasShares, hasGas, limitedByLiquidity, run, decimals };
+  return { strategy, info, m, pos, wallet, tx, sim, amount, setAmount, mode, setMode, detailsOpen, setDetailsOpen, parsed, balance, maxAmount, enough, hasShares, hasGas, limitedByLiquidity, run, decimals };
 }
 
 type Ctx = ReturnType<typeof useStockYieldState>;
@@ -89,7 +94,6 @@ export function StockYieldProvider({ children }: { children: ReactNode }) {
       <WalletPicker open={wallet.walletPicker} onOpenChange={wallet.setWalletPicker} wallets={wallet.wallets} onPick={wallet.connectWith} />
       <TxDialog
         open={tx.open}
-        busy={tx.busy}
         step={tx.step}
         action={tx.action}
         approvalNeeded={tx.approvalNeeded}
