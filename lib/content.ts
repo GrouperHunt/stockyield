@@ -24,5 +24,5 @@ export const FAQ: { q: string; a: string }[] = [
   { q: "Can I withdraw at any time?", a: "Withdrawals follow the vault contract's rules and the liquidity available in the underlying lending markets, so StockYield cannot promise that your whole position can be withdrawn immediately. Every withdrawal is simulated before you sign, and you are told if it would fail." },
   { q: "Is the APY guaranteed?", a: "No. It is variable and can rise, fall or be zero. The rate shown is the net APY reported by Morpho (after vault fees, including rewards). Capital is at risk." },
   { q: "What fees apply?", a: "The vault can charge a management fee and a performance fee; current values are shown live in Strategy details. StockYield charges no fee. You also pay the network fee in ETH." },
-  { q: "Do I need the SYLD token?", a: "No. The SYLD token is not needed to deposit, withdraw or earn in this strategy, and it does not change your yield." },
+  { q: "Do I need the SYELD token?", a: "No. The SYELD token is not needed to deposit, withdraw or earn in this strategy, and it does not change your yield." },
 ];

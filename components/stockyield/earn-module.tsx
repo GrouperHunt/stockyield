@@ -135,7 +135,7 @@ export function EarnModule() {
           rows={[
             ["Current net APY (variable)", <span key="a" className="num">{m.error && !metrics ? "Unavailable" : metrics ? pct(metrics.netApy) : <span className="skeleton">0.00%</span>}</span>],
             mode === "deposit"
-              ? ["Estimated annual yield", <span key="y" className="num">{metrics ? cash(Number(amount || 0) * metrics.netApy) : "Unavailable"}</span>]
+              ? ["Estimated annual yield", <span key="y"><span className="num">{!metrics ? "Unavailable" : parsed > 0n ? cash(Number(amount) * metrics.netApy) : "—"}</span><span className="mt-1 block text-xs font-normal text-ink-2">Estimate at current variable APY. Not guaranteed.</span></span>]
               : ["You receive (estimate)", <span key="r" className="num">{parsed > 0n ? `≈ ${fmt(parsed, decimals)} USDG` : "—"}</span>],
             ...(mode === "withdraw" ? ([["Recipient", address ? <span key="d" className="num">{short(address)} (your wallet)</span> : "—"]] as [string, React.ReactNode][]) : []),
           ]}

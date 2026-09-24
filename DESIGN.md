@@ -108,7 +108,7 @@ Waiting for wallet (pulsing ring) · Submitted (hash + explorer link, indetermin
 
 **Accordion (FAQ)**: hairline rows, + / – glyph, 200ms height ease; one open at a time optional.
 
-**Footer**: graphite inverted band; wordmark, disclaimer "Variable returns. Capital at risk. StockYield does not guarantee yield or principal.", non-affiliation "StockYield is an independent interface and is not affiliated with Robinhood, Morpho or Steakhouse.", links (Vault contract, Morpho docs). Pons/SYLD link appears here only when live and verified.
+**Footer**: graphite inverted band; wordmark, disclaimer "Variable returns. Capital at risk. StockYield does not guarantee yield or principal.", non-affiliation "StockYield is an independent interface and is not affiliated with Robinhood, Morpho or Steakhouse.", links (Vault contract, Morpho docs). Pons/SYELD link appears here only when live and verified.
 
 ### Brand assets (delivered in `stockyield-brand/`, linked, never modified)
 - `favicon.ico`, `apple-touch-icon.png` (180), `icon-192.png`, `icon-512.png` → site icons via Next metadata.
@@ -161,7 +161,7 @@ Do
 - Pair every status color with an icon shape and a word.
 - Say precisely what happened: hash ≠ success; only `receipt.status === success` is "Confirmed".
 - Keep StockYield / Steakhouse / Morpho / Robinhood Chain roles distinct in copy.
-- Keep the primary CTA about Earn; keep SYLD out of the flow.
+- Keep the primary CTA about Earn; keep SYELD out of the flow.
 - Show a visible focus ring on every interactive element; 44×44px touch targets.
 
 Don't
