@@ -38,11 +38,11 @@ function rpcHandler(delayMs = 0) {
   };
 }
 
-async function setup(browser, { chain = "0x1237", rejectSwitch = false, delay = 0, apiDown = false, install = false } = {}) {
+async function setup(browser, { chain = "0x1237", rejectSwitch = false, delay = 0, apiDown = false, install = false, receiptStatus = null, holdReads = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   await page.addInitScript(({ ADDR, chain, rejectSwitch }) => {
-    window.__calls = []; let cur = chain;
+    window.__calls = []; window.__ls = {}; let cur = chain;
     window.ethereum = {
       request: async ({ method, params }) => {
         window.__calls.push(method);
@@ -56,10 +56,21 @@ async function setup(browser, { chain = "0x1237", rejectSwitch = false, delay = 
         if (method === "eth_getBlockByNumber") return { baseFeePerGas: "0x1", number: "0x10", timestamp: "0x1", transactions: [], gasLimit: "0x1c9c380" };
         return null;
       },
-      on() {}, removeListener() {},
+      on(ev, cb) { (window.__ls[ev] ||= []).push(cb); }, removeListener() {},
     };
+    window.__ls = window.__ls || {}; window.__emit = (ev, arg) => (window.__ls[ev] || []).forEach((cb) => cb(arg));
   }, { ADDR, chain, rejectSwitch });
-  await page.route("https://rpc.mainnet.chain.robinhood.com/**", rpcHandler(delay));
+  const base = rpcHandler(delay);
+  const receipt = (status) => ({ status, transactionHash: "0x" + "ab".repeat(32), blockNumber: "0x10", blockHash: "0x" + "1".repeat(64), transactionIndex: "0x0", from: ADDR, to: "0xBeEff033F34C046626B8D0A041844C5d1A5409dd", cumulativeGasUsed: "0x1", gasUsed: "0x1", effectiveGasPrice: "0x1", logs: [], logsBloom: "0x" + "0".repeat(512), type: "0x2", contractAddress: null });
+  await page.route("https://rpc.mainnet.chain.robinhood.com/**", async (route) => {
+    const body = JSON.parse(route.request().postData());
+    const isRcpt = (r) => r.method === "eth_getTransactionReceipt";
+    if (receiptStatus && (Array.isArray(body) ? body.some(isRcpt) : isRcpt(body))) {
+      const one = (r) => ({ jsonrpc: "2.0", id: r.id, result: isRcpt(r) ? receipt(receiptStatus) : null });
+      return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(Array.isArray(body) ? body.map(one) : one(body)) });
+    }
+    return base(route);
+  });
   if (apiDown) await page.route("**/api/strategy", r => r.fulfill({ status: 503, body: '{"error":"x"}', contentType: "application/json" }));
   if (install) await page.clock.install();
   await page.goto(URL);
@@ -116,6 +127,36 @@ const browser = await chromium.launch();
   await page.waitForTimeout(12000);
   const t2 = await page.locator("main").innerText();
   ok("D2 after load: real value appears", /\$99[89]\.|\$1,000\./.test(t2));
+  await ctx.close(); }
+
+// E: reverted receipt -> failure text is visible (toast and dialog), never "confirmed"
+{ const { ctx, page } = await setup(browser, { receiptStatus: "0x0" }); await page.waitForTimeout(2500);
+  await page.getByRole("tab", { name: "Withdraw" }).click();
+  await page.locator('input[aria-label="Amount"]').fill("10"); await page.waitForTimeout(300);
+  await btn(page).click();
+  const toast = page.locator("[data-sonner-toast]").filter({ hasText: /reverted on-chain/ });
+  await toast.first().waitFor({ timeout: 8000 }).catch(() => {});
+  const t = (await toast.allInnerTexts()).join(" / ").replace(/\n+/g, " | ");
+  ok("E1 reverted receipt: toast says the withdrawal reverted on-chain", /Transaction not completed/.test(t) && /withdrawal transaction reverted on-chain/i.test(t), t);
+  ok("E2 reverted receipt: never shown as confirmed", (await page.getByText("Transaction confirmed").count()) === 0);
+  await ctx.close(); }
+
+// F: a read still in flight when the wallet disconnects must not resurface after reconnecting
+{ const { ctx, page } = await setup(browser, { delay: 3000 }); await page.waitForTimeout(800);
+  await page.evaluate(() => window.__emit("accountsChanged", [])); await page.waitForTimeout(8500); // the old read resolves now
+  await page.getByRole("button", { name: /Connect wallet/ }).first().click(); await page.waitForTimeout(800); // new read still pending
+  const t = await page.locator("main").innerText();
+  ok("F1 disconnect then reconnect: shows Loading, never the old read's value", /Loading position/.test(t) && !/supplied/.test(t), (t.match(/Loading position[^\n]*|\$[0-9,.]+ supplied/) || [""])[0]);
+  await ctx.close(); }
+
+// G: account switched while a transaction is pending -> old operation is invalidated
+{ const { ctx, page } = await setup(browser, { install: true }); await page.waitForTimeout(2500);
+  await page.getByRole("tab", { name: "Withdraw" }).click();
+  await page.locator('input[aria-label="Amount"]').fill("10"); await page.waitForTimeout(300);
+  await btn(page).click(); await page.waitForTimeout(1500);
+  await page.evaluate(() => window.__emit("accountsChanged", ["0x2222222222222222222222222222222222222222"])); await page.waitForTimeout(500);
+  await page.clock.fastForward(200000); await page.waitForTimeout(1500);
+  ok("G1 account switched mid-operation: dialog closed, old 'Still pending' not shown", (await page.getByRole("dialog").count()) === 0 && (await page.getByText("Still pending").count()) === 0);
   await ctx.close(); }
 
 await browser.close();
