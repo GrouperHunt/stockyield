@@ -179,6 +179,8 @@ export default function StockYieldApp() {
       }
       const a = list[0] as Address;
       setAddress(a);
+      setPosition(null);
+      setPositionError(false);
       setAmount("");
       setTxOpen(false);
       void loadPosition(a);
@@ -420,7 +422,7 @@ export default function StockYieldApp() {
             <TabsContent value={mode} className="m-0 p-5 pt-7 md:p-7">
               <div className="flex justify-between text-sm text-white/65">
                 <span>{mode === "deposit" ? "Wallet balance" : "Available to withdraw"}</span>
-                <span>{position ? `${Number(formatUnits(balance, USDG_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })} USDG` : positionError ? "Unavailable" : "Connect wallet"}</span>
+                <span>{position ? `${Number(formatUnits(balance, USDG_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })} USDG` : positionError ? "Unavailable" : address ? "Loading…" : "Connect wallet"}</span>
               </div>
               <div className="mt-4 rounded-[22px] border border-white/12 bg-white/[.06] p-5">
                 <div className="flex items-center gap-3">
@@ -461,14 +463,14 @@ export default function StockYieldApp() {
             <div>
               <p className="text-sm text-[#718078]">My position</p>
               <h2 className="mt-1 text-2xl font-semibold">
-                {!address ? "Connect to view your position" : positionError ? "Position unavailable" : `${cash(Number(formatUnits(position?.assets ?? 0n, USDG_DECIMALS)) * (strategy?.assetPriceUsd ?? 1))} supplied`}
+                {!address ? "Connect to view your position" : positionError ? "Unable to load your position" : !position ? "Loading position…" : `${cash(Number(formatUnits(position?.assets ?? 0n, USDG_DECIMALS)) * (strategy?.assetPriceUsd ?? 1))} supplied`}
               </h2>
             </div>
             {address && <Button variant="outline" onClick={() => loadPosition(address)} className="rounded-full"><RefreshCw size={15} className="mr-2" />Refresh</Button>}
           </div>
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <Position l="Current value" v={!address ? "—" : positionError ? "Unavailable" : cash(Number(formatUnits(position?.assets ?? 0n, USDG_DECIMALS)) * (strategy?.assetPriceUsd ?? 1))} />
-            <Position l="Vault shares" v={!address ? "—" : positionError ? "Unavailable" : Number(formatUnits(position?.shares ?? 0n, 18)).toLocaleString(undefined, { maximumFractionDigits: 4 })} />
+            <Position l="Current value" v={!address ? "—" : positionError ? "Unavailable" : !position ? "Loading…" : cash(Number(formatUnits(position?.assets ?? 0n, USDG_DECIMALS)) * (strategy?.assetPriceUsd ?? 1))} />
+            <Position l="Vault shares" v={!address ? "—" : positionError ? "Unavailable" : !position ? "Loading…" : Number(formatUnits(position?.shares ?? 0n, 18)).toLocaleString(undefined, { maximumFractionDigits: 4 })} />
             <Position l="Current APY" v={pct(strategy?.netApy)} />
           </div>
           <p className="mt-5 text-xs text-[#8a978f]">Net deposits and realized yield aren&apos;t shown because they require a verified transfer history for your shares, which isn&apos;t available yet. This is your current position value only, not a profit figure.</p>
